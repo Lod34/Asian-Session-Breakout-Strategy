@@ -254,204 +254,6 @@ isSession(_session, _dst) =>
 
     h >= currentSession.openHours.get(sessionIndex) and h < currentSession.closeHours.get(sessionIndex)
 
-plotSession(_show, _currentSession, _session, _dst, _color, _extendMaxMinMid, _fillBackground, _showMargin) =>
-    var line highLine = na, var line lowLine = na, var box sessionBox = na
-    var line lastHighLine = na, var line lastLowLine = na, var line lastMidLine = na
-
-    if _show 
-        isCurrentSession = isSession(_currentSession, _dst)
-
-        if isCurrentSession and isCurrentSession != isCurrentSession[1]
-            highLine := line.new(currentBar.index, currentBar.high, currentBar.index, currentBar.high, xloc.bar_index, extend.none, color.new(_color, sessionsExtremeLines ? 0 : sessionsFillTransparency), line.style_solid, sessionsLinesWidth)
-            lowLine := line.new(currentBar.index, currentBar.low, currentBar.index, currentBar.low, xloc.bar_index, extend.none, color.new(_color, sessionsExtremeLines ? 0 : sessionsFillTransparency), line.style_solid, sessionsLinesWidth)
-           
-            if _currentSession == asiaSessionTitle
-                asiatic_session_high = currentBar.high
-                asiatic_session_low = currentBar.low
-
-            if _fillBackground
-                linefill.new(highLine, lowLine, color.new(_color, sessionsFillTransparency))
-
-            if sessionsNames
-                sessionBox := box.new (currentBar.index, currentBar.low, currentBar.index, currentBar.low, text = _currentSession, text_size = size.tiny, text_halign = text.align_left, text_valign = text.align_top, 
-                               text_color = color.new(_color, 25), bgcolor = color(na), border_color = color(na))
-
-        if isCurrentSession
-            highLine.set_y1(math.max(currentBar.high, highLine.get_y1())), highLine.set_y2(math.max(currentBar.high, highLine.get_y2())), highLine.set_x2(currentBar.index)
-            lowLine.set_y1(math.min(currentBar.low, lowLine.get_y1())), lowLine.set_y2(math.min(currentBar.low, lowLine.get_y2())), lowLine.set_x2(currentBar.index)
-
-            if sessionsNames
-                sessionBox.set_bottom(math.min(currentBar.low, lowLine.get_y1())), sessionBox.set_top(math.min(currentBar.low, lowLine.get_y1()))
-
-        if not isCurrentSession and isCurrentSession != isCurrentSession[1]
-            currentSession.highLine := line.new(currentBar.index - 1, highLine.get_y1(), currentBar.index, highLine.get_y2(), xloc.bar_index, extend.none, _extendMaxMinMid ? _color : color(na), line.style_dotted, sessionsLinesWidth)
-            currentSession.midLine := line.new(currentBar.index - 1, math.avg(highLine.get_y1(), lowLine.get_y1()), currentBar.index, math.avg(highLine.get_y2(), lowLine.get_y2()), xloc.bar_index, extend.none, _showMargin ? _color : color(na), line.style_dotted, sessionsLinesWidth)
-            currentSession.lowLine := line.new(currentBar.index - 1, lowLine.get_y1(), currentBar.index, lowLine.get_y2(), xloc.bar_index, extend.none, _extendMaxMinMid ? _color : color(na), line.style_dotted, sessionsLinesWidth)
-
-            currentSession.buySide := false, currentSession.buyZone := false
-            currentSession.sellSide := false, currentSession.sellZone := false
-
-            if _currentSession == londonSessionTitle and newYorkAmSessionShow
-                currentSession.highPrice := highLine.get_y1()
-                currentSession.lowPrice := lowLine.get_y1()
-                lastHighLine := line.new(currentBar.index - 1, currentSession.highPrice, currentBar.index, currentSession.highPrice, xloc.bar_index, extend.none, _extendMaxMinMid ? _color : color(na), line.style_dotted, sessionsLinesWidth)
-                lastMidLine := line.new(currentBar.index - 1, math.avg(currentSession.highPrice, currentSession.lowPrice), currentBar.index, math.avg(currentSession.highPrice, currentSession.lowPrice), xloc.bar_index, extend.none, _showMargin ? _color : color(na), line.style_dotted, sessionsLinesWidth)
-                lastLowLine := line.new(currentBar.index - 1, currentSession.lowPrice, currentBar.index, currentSession.lowPrice, xloc.bar_index, extend.none, _extendMaxMinMid ? _color : color(na), line.style_dotted, sessionsLinesWidth)
-                currentSession.lastBuySide := false, currentSession.lastBuyZone := false
-                currentSession.lastSellSide := false, currentSession.lastSellZone := false
-            else if _currentSession == newYorkPmSessionTitle
-                currentSession.highPrice := 10e6
-                currentSession.lowPrice := 0
-
-        if not isCurrentSession
-            currentSession.highLine.set_x2(currentBar.index - 1)
-            currentSession.midLine.set_x2(currentBar.index - 1)
-            currentSession.lowLine.set_x2(currentBar.index - 1)
-
-            if _currentSession == londonSessionTitle and currentSession.lowPrice != 0
-                lastHighLine.set_x2(currentBar.index - 1)
-                lastMidLine.set_x2(currentBar.index - 1)
-                lastLowLine.set_x2(currentBar.index - 1)
-
-    if showBuySideSweepZones
-        plotHigh = currentSession.highLine.get_y1()
-
-        if not currentSession.buySide
-
-            if currentBar.high > plotHigh and currentBar.open < plotHigh
-                alert(syminfo.ticker + ' buyside session level breached, price ' + str.tostring(currentBar.close, format.mintick) + ', timeframe ' + timeframe.period, alert.freq_once_per_bar)
-                currentSession.buyZoneBox := box.new (currentBar.index - 1, math.min(plotHigh + buySideSweepMargin * sweepAverageTrueRange, currentBar.high), currentBar.index + 1, plotHigh, bgcolor = buySideSweepColor, border_color = color(na))
-                buy_side_sweep = true
-
-                currentSession.buyZone := true
-                currentSession.buySide := true
-
-        else if currentSession.buyZone
-
-            if currentBar.low > plotHigh - buySideSweepMargin * sweepAverageTrueRange and currentBar.high < plotHigh + buySideSweepMargin * sweepAverageTrueRange
-                currentSession.buyZoneBox.set_top(math.max(currentBar.high, currentSession.buyZoneBox.get_top()))
-
-                if currentBar.high > plotHigh
-                    currentSession.buyZoneBox.set_right(currentBar.index + 1)
-                na
-            else
-                if currentBar.close > plotHigh + buySideSweepMargin * sweepAverageTrueRange * 1.5
-                    currentSession.buyZoneBox.set_bgcolor(hideFakeSweepZones ? color(na) : fakeSweepColor)
-                    currentSession.buyZoneBox.set_right(currentBar.index)
-                    currentSession.buyZone := false
-                else if currentBar.index - currentSession.buyZoneBox.get_right() >= sweepMarginLength
-                    if currentBar.high > plotHigh + buySideSweepMargin * sweepAverageTrueRange
-                        currentSession.buyZoneBox.set_bgcolor(hideFakeSweepZones ? color(na) : fakeSweepColor)
-                        currentSession.buyZoneBox.set_right(currentBar.index + 1)
-
-                    currentSession.buyZone := false
-                    if not detectSweepsOncePerSession
-                        currentSession.buySide := false
-
-        if _currentSession == londonSessionTitle and newYorkAmSessionShow 
-            lastPlotHigh = currentSession.highPrice
-
-            if not currentSession.lastBuySide
-
-                if currentBar.high > lastPlotHigh and currentBar.open < lastPlotHigh
-                    alert(syminfo.ticker + ' buyside session level breached, price ' + str.tostring(currentBar.close, format.mintick) + ', timeframe ' + timeframe.period, alert.freq_once_per_bar)
-                    currentSession.lastBuyZoneBox := box.new (currentBar.index - 1, math.min(lastPlotHigh + buySideSweepMargin * sweepAverageTrueRange, currentBar.high), currentBar.index + 1, lastPlotHigh, bgcolor = buySideSweepColor, border_color = color(na))
-                    buy_side_sweep = true
-
-                    currentSession.lastBuyZone := true
-                    currentSession.lastBuySide := true
-
-            else if currentSession.lastBuyZone
-
-                if currentBar.low > lastPlotHigh - buySideSweepMargin * sweepAverageTrueRange and currentBar.high < lastPlotHigh + buySideSweepMargin * sweepAverageTrueRange
-                    currentSession.lastBuyZoneBox.set_top(math.max(currentBar.high, currentSession.lastBuyZoneBox.get_top()))
-
-                    if currentBar.high > lastPlotHigh
-                        currentSession.lastBuyZoneBox.set_right(currentBar.index + 1)
-                    na
-                else
-                    if currentBar.close > lastPlotHigh + buySideSweepMargin * sweepAverageTrueRange * 1.5
-                        currentSession.lastBuyZoneBox.set_bgcolor(hideFakeSweepZones ? color(na) : fakeSweepColor)
-                        currentSession.lastBuyZoneBox.set_right(currentBar.index)
-                        currentSession.lastBuyZone := false
-                    else if currentBar.index - currentSession.lastBuyZoneBox.get_right() >= sweepMarginLength
-                        if currentBar.high > lastPlotHigh + buySideSweepMargin * sweepAverageTrueRange
-                            currentSession.lastBuyZoneBox.set_bgcolor(hideFakeSweepZones ? color(na) : fakeSweepColor)
-                            currentSession.lastBuyZoneBox.set_right(currentBar.index + 1)
-
-                        currentSession.lastBuyZone := false
-                        if not detectSweepsOncePerSession
-                            currentSession.lastBuySide := false
-
-    if showSellSideSweepZones
-        plotLow = currentSession.lowLine.get_y1()
-
-        if not currentSession.sellSide
-
-            if currentBar.low < plotLow and currentBar.open > plotLow
-                alert(syminfo.ticker + ' sellside session level breached, price ' + str.tostring(currentBar.close, format.mintick) + ', timeframe ' + timeframe.period, alert.freq_once_per_bar)
-                currentSession.sellZoneBox := box.new (currentBar.index - 1, plotLow, currentBar.index + 1, math.max(plotLow - sellSideSweepMargin * sweepAverageTrueRange, currentBar.low), bgcolor = sellSideSweepColor, border_color = color(na))
-                sell_side_sweep = true
-
-                currentSession.sellZone := true
-                currentSession.sellSide := true
-
-        else if currentSession.sellZone
-
-            if currentBar.low > plotLow - sellSideSweepMargin * sweepAverageTrueRange and currentBar.high < plotLow + sellSideSweepMargin * sweepAverageTrueRange
-                currentSession.sellZoneBox.set_bottom(math.min(currentBar.low, currentSession.sellZoneBox.get_bottom()))
-
-                if currentBar.low < plotLow
-                    currentSession.sellZoneBox.set_right(currentBar.index + 1)
-                na
-            else
-                if currentBar.close < plotLow - sellSideSweepMargin * sweepAverageTrueRange * 1.5
-                    currentSession.sellZoneBox.set_bgcolor(hideFakeSweepZones ? color(na) : fakeSweepColor)
-                    currentSession.sellZoneBox.set_right(currentBar.index + 1)
-                    currentSession.sellZone := false
-                else if currentBar.index - currentSession.sellZoneBox.get_right() >= sweepMarginLength
-                    if currentBar.low < plotLow - sellSideSweepMargin * sweepAverageTrueRange
-                        currentSession.sellZoneBox.set_bgcolor(hideFakeSweepZones ? color(na) : fakeSweepColor)
-                        currentSession.sellZoneBox.set_right(currentBar.index + 1)
-
-                    currentSession.sellZone := false
-                    if not detectSweepsOncePerSession
-                        currentSession.sellSide := false
-
-        if _currentSession == londonSessionTitle and newYorkAmSessionShow
-            lastPlotLow = currentSession.lowPrice
-
-            if not currentSession.lastSellSide
-
-                if currentBar.low < lastPlotLow and currentBar.open > lastPlotLow
-                    alert(syminfo.ticker + ' sellside session level breached, price ' + str.tostring(currentBar.close, format.mintick) + ', timeframe ' + timeframe.period, alert.freq_once_per_bar)
-                    currentSession.lastSellZoneBox := box.new (currentBar .index - 1, lastPlotLow, currentBar.index + 1, math.max(lastPlotLow - sellSideSweepMargin * sweepAverageTrueRange, currentBar.low), bgcolor = sellSideSweepColor, border_color = color(na))
-                    sell_side_sweep = true
-
-                    currentSession.lastSellZone := true
-                    currentSession.lastSellSide := true
-
-            else if currentSession.lastSellZone
-
-                if currentBar.low > lastPlotLow - sellSideSweepMargin * sweepAverageTrueRange and currentBar.high < lastPlotLow + sellSideSweepMargin * sweepAverageTrueRange
-                    currentSession.lastSellZoneBox.set_bottom(math.min(currentBar.low, currentSession.lastSellZoneBox.get_bottom()))
-
-                    if currentBar.low < lastPlotLow
-                        currentSession.lastSellZoneBox.set_right(currentBar.index + 1)
-                    na
-                else
-                    if currentBar.close < lastPlotLow - sellSideSweepMargin * sweepAverageTrueRange * 1.5
-                        currentSession.lastSellZoneBox.set_bgcolor(hideFakeSweepZones ? color(na) : fakeSweepColor)
-                        currentSession.lastSellZoneBox.set_right(currentBar.index)
-                        currentSession.lastSellZone := false
-                    else if currentBar.index - currentSession.lastSellZoneBox.get_right() >= sweepMarginLength
-                        if currentBar.low < lastPlotLow - sellSideSweepMargin * sweepAverageTrueRange
-                            currentSession.lastSellZoneBox.set_bgcolor(hideFakeSweepZones ? color(na) : fakeSweepColor)
-                            currentSession.lastSellZoneBox.set_right(currentBar.index + 1)
-
-                        currentSession.lastSellZone := false
-                        if not detectSweepsOncePerSession
-                            currentSession.lastSellSide := false
 
 method clearFairValueGap(FairValueGap _id) =>
     _id.upperFairValueGaps.pop()
@@ -540,10 +342,192 @@ if barstate.islast and sessionsTabularViewShow and hide
 //-----------------------------------------------------------------------------{
 
 if timeframe.isintraday and timeframeMultiplier <= 5
-    plotSession(asiaSessionShow  , asiaSessionTitle  , londonSessionShow  ? londonSessionTitle  : newYorkAmSessionShow ? newYorkAmSessionTitle : newYorkPmSessionShow ? newYorkPmSessionTitle : asiaSessionTitle  , false , asiaSessionColor  , asiaSessionExtendMaxMinMid  , asiaSessionFillBackground  , asiaSessionShowMargin  )
-    plotSession(londonSessionShow , londonSessionTitle , newYorkPmSessionShow ? newYorkPmSessionTitle : asiaSessionShow   ? asiaSessionTitle   : londonSessionTitle , londonDaylightSavingTime, londonSessionColor , londonSessionExtendMaxMinMid , londonSessionFillBackground , londonSessionShowMargin )
-    plotSession(newYorkAmSessionShow, newYorkAmSessionTitle, newYorkPmSessionShow ? newYorkPmSessionTitle : asiaSessionShow   ? asiaSessionTitle   : londonSessionShow  ? londonSessionTitle  : newYorkAmSessionTitle, newYorkDaylightSavingTime , newYorkAmSessionColor, newYorkAmSessionExtendMaxMinMid, newYorkAmSessionFillBackground, newYorkAmSessionShowMargin)
-    plotSession(newYorkPmSessionShow, newYorkPmSessionTitle, asiaSessionShow   ? asiaSessionTitle   : londonSessionShow  ? londonSessionTitle  : newYorkAmSessionShow ? newYorkAmSessionTitle : newYorkPmSessionTitle, newYorkDaylightSavingTime , newYorkPmSessionColor, newYorkPmSessionExtendMaxMinMid, newYorkPmSessionFillBackground, newYorkPmSessionShowMargin) 
+    
+    var line highLine = na, var line lowLine = na, var box sessionBox = na
+    var line lastHighLine = na, var line lastLowLine = na, var line lastMidLine = na
+
+    if asiaSessionShow 
+        isCurrentSession = isSession(londonSessionShow ? londonSessionTitle : newYorkAmSessionShow ? newYorkAmSessionTitle : newYorkPmSessionShow ? newYorkPmSessionTitle : asiaSessionTitle, false)
+
+        if isCurrentSession and isCurrentSession != isCurrentSession[1]
+            
+            highLine := line.new(currentBar.index, currentBar.high, currentBar.index, currentBar.high, xloc.bar_index, extend.none, color.new(asiaSessionColor, sessionsExtremeLines ? 0 : sessionsFillTransparency), line.style_solid, sessionsLinesWidth)
+            lowLine := line.new(currentBar.index, currentBar.low, currentBar.index, currentBar.low, xloc.bar_index, extend.none, color.new(asiaSessionColor, sessionsExtremeLines ? 0 : sessionsFillTransparency), line.style_solid, sessionsLinesWidth)
+            
+            if asiaSessionTitle == asiaSessionTitle
+                asiatic_session_high := currentBar.high
+                asiatic_session_low := currentBar.low
+            if asiaSessionFillBackground
+                linefill.new(highLine, lowLine, color.new(asiaSessionColor, sessionsFillTransparency))
+
+            if sessionsNames
+                sessionBox := box.new (currentBar.index, currentBar.low, currentBar.index, currentBar.low, text = asiaSessionTitle, text_size = size.tiny, text_halign = text.align_left, text_valign = text.align_top, text_color = color.new(asiaSessionColor, 25), bgcolor = color(na), border_color = color(na))
+
+        if isCurrentSession
+            highLine.set_y1(math.max(currentBar.high, highLine.get_y1())), highLine.set_y2(math.max(currentBar.high, highLine.get_y2())), highLine.set_x2(currentBar.index)
+            lowLine.set_y1(math.min(currentBar.low, lowLine.get_y1())), lowLine.set_y2(math.min(currentBar.low, lowLine.get_y2())), lowLine.set_x2(currentBar.index)
+
+            if sessionsNames
+                sessionBox.set_bottom(math.min(currentBar.low, lowLine.get_y1())), sessionBox.set_top(math.min(currentBar.low, lowLine.get_y1()))
+
+        if not isCurrentSession and isCurrentSession != isCurrentSession[1]
+            currentSession.highLine := line.new(currentBar.index - 1, highLine.get_y1(), currentBar.index, highLine.get_y2(), xloc.bar_index, extend.none, asiaSessionExtendMaxMinMid ? asiaSessionColor : color(na), line.style_dotted, sessionsLinesWidth)
+            currentSession.midLine := line.new(currentBar.index - 1, math.avg(highLine.get_y1(), lowLine.get_y1()), currentBar.index, math.avg(highLine.get_y2(), lowLine.get_y2()), xloc.bar_index, extend.none, asiaSessionShowMargin ? asiaSessionColor : color(na), line.style_dotted, sessionsLinesWidth)
+            currentSession.lowLine := line.new(currentBar.index - 1, lowLine.get_y1(), currentBar.index, lowLine.get_y2(), xloc.bar_index, extend.none, asiaSessionExtendMaxMinMid ? asiaSessionColor : color(na), line.style_dotted, sessionsLinesWidth)
+
+            currentSession.buySide := false, currentSession.buyZone := false
+            currentSession.sellSide := false, currentSession.sellZone := false
+
+        if not isCurrentSession
+            currentSession.highLine.set_x2(currentBar.index - 1)
+            currentSession.midLine.set_x2(currentBar.index - 1)
+            currentSession.lowLine.set_x2(currentBar.index - 1)
+
+            if asiaSessionTitle == asiaSessionTitle and currentSession.lowPrice != 0
+                lastHighLine.set_x2(currentBar.index - 1)
+                lastMidLine.set_x2(currentBar.index - 1)
+                lastLowLine.set_x2(currentBar.index - 1)
+
+        if showBuySideSweepZones
+            plotHigh = currentSession.highLine.get_y1()
+
+            if not currentSession.buySide
+
+                if currentBar.high > plotHigh and currentBar.open < plotHigh
+                    alert(syminfo.ticker + ' buyside session level breached, price ' + str.tostring(currentBar.close, format.mintick) + ', timeframe ' + timeframe.period, alert .freq_once_per_bar)
+                    currentSession.buyZoneBox := box.new (currentBar.index - 1, math.min(plotHigh + buySideSweepMargin * sweepAverageTrueRange, currentBar.high), currentBar.index + 1, plotHigh, bgcolor = buySideSweepColor, border_color = color(na))
+                    buy_side_sweep := true
+
+                    currentSession.buyZone := true
+                    currentSession.buySide := true
+
+            else if currentSession.buyZone
+
+                if currentBar.low > plotHigh - buySideSweepMargin * sweepAverageTrueRange and currentBar.high < plotHigh + buySideSweepMargin * sweepAverageTrueRange
+                    currentSession.buyZoneBox.set_top(math.max(currentBar.high, currentSession.buyZoneBox.get_top()))
+
+                    if currentBar.high > plotHigh
+                        currentSession.buyZoneBox.set_right(currentBar.index + 1)
+                    na
+                else
+                    if currentBar.close > plotHigh + buySideSweepMargin * sweepAverageTrueRange * 1.5
+                        currentSession.buyZoneBox.set_bgcolor(hideFakeSweepZones ? color(na) : fakeSweepColor)
+                        currentSession.buyZoneBox.set_right(currentBar.index)
+                        currentSession.buyZone := false
+                    else if currentBar.index - currentSession.buyZoneBox.get_right() >= sweepMarginLength
+                        if currentBar.high > plotHigh + buySideSweepMargin * sweepAverageTrueRange
+                            currentSession.buyZoneBox.set_bgcolor(hideFakeSweepZones ? color(na) : fakeSweepColor)
+                            currentSession.buyZoneBox.set_right(currentBar.index + 1)
+
+                        currentSession.buyZone := false
+                        if not detectSweepsOncePerSession
+                            currentSession.buySide := false
+
+            if asiaSessionTitle == asiaSessionTitle and newYorkAmSessionShow 
+                lastPlotHigh = currentSession.highPrice
+
+                if not currentSession.lastBuySide
+
+                    if currentBar.high > lastPlotHigh and currentBar.open < lastPlotHigh
+                        alert(syminfo.ticker + ' buyside session level breached, price ' + str.tostring(currentBar.close, format.mintick) + ', timeframe ' + timeframe.period, alert.freq_once_per_bar)
+                        currentSession.lastBuyZoneBox := box.new (currentBar.index - 1, math.min(lastPlotHigh + buySideSweepMargin * sweepAverageTrueRange, currentBar.high), currentBar.index + 1, lastPlotHigh, bgcolor = buySideSweepColor, border_color = color(na))
+                        buy_side_sweep := true
+
+                        currentSession.lastBuyZone := true
+                        currentSession.lastBuySide := true
+
+                else if currentSession.lastBuyZone
+
+                    if currentBar.low > lastPlotHigh - buySideSweepMargin * sweepAverageTrueRange and currentBar.high < lastPlotHigh + buySideSweepMargin * sweepAverageTrueRange
+                        currentSession.lastBuyZoneBox.set_top(math.max(currentBar.high, currentSession.lastBuyZoneBox.get_top()))
+
+                        if currentBar.high > lastPlotHigh
+                            currentSession.lastBuyZoneBox.set_right(currentBar.index + 1)
+                        na
+                    else
+                        if currentBar.close > lastPlotHigh + buySideSweepMargin * sweepAverageTrueRange * 1.5
+                            currentSession.lastBuyZoneBox.set_bgcolor(hideFakeSweepZones ? color(na) : fakeSweepColor)
+                            currentSession.lastBuyZoneBox.set_right(currentBar.index)
+                            currentSession.lastBuyZone := false
+                        else if currentBar.index - currentSession.lastBuyZoneBox.get_right() >= sweepMarginLength
+                            if currentBar.high > lastPlotHigh + buySideSweepMargin * sweepAverageTrueRange
+                                currentSession.lastBuyZoneBox.set_bgcolor(hideFakeSweepZones ? color(na) : fakeSweepColor)
+                                currentSession.lastBuyZoneBox.set_right(currentBar.index + 1)
+
+                            currentSession.lastBuyZone := false
+                            if not detectSweepsOncePerSession
+                                currentSession.lastBuySide := false
+
+        if showSellSideSweepZones
+            plotLow = currentSession.lowLine.get_y1()
+
+            if not currentSession.sellSide
+
+                if currentBar.low < plotLow and currentBar.open > plotLow
+                    alert(syminfo.ticker + ' sellside session level breached, price ' + str.tostring(currentBar.close, format.mintick) + ', timeframe ' + timeframe.period, alert.freq_once_per_bar)
+                    currentSession.sellZoneBox := box.new (currentBar.index - 1, plotLow, currentBar.index + 1, math.max(plotLow - sellSideSweepMargin * sweepAverageTrueRange, currentBar.low), bgcolor = sellSideSweepColor, border_color = color(na))
+                    sell_side_sweep := true
+
+                    currentSession.sellZone := true
+                    currentSession.sellSide := true
+
+            else if currentSession.sellZone
+
+                if currentBar.low > plotLow - sellSideSweepMargin * sweepAverageTrueRange and currentBar.high < plotLow + sellSideSweepMargin * sweepAverageTrueRange
+                    currentSession.sellZoneBox.set_bottom(math.min(currentBar.low, currentSession.sellZoneBox.get_bottom()))
+
+                    if currentBar.low < plotLow
+                        currentSession.sellZoneBox.set_right(currentBar.index + 1)
+                    na
+                else
+                    if currentBar.close < plotLow - sellSideSweepMargin * sweepAverageTrueRange * 1.5
+                        currentSession.sellZoneBox.set_bgcolor(hideFakeSweepZones ? color(na) : fakeSweepColor)
+                        currentSession.sellZoneBox.set_right(currentBar.index)
+                        currentSession.sellZone := false
+                    else if currentBar.index - currentSession.sellZoneBox.get_right() >= sweepMarginLength
+                        if currentBar.low < plotLow - sellSideSweepMargin * sweepAverageTrueRange
+                            currentSession.sellZoneBox.set_bgcolor(hideFakeSweepZones ? color(na) : fakeSweepColor)
+                            currentSession.sellZoneBox.set_right(currentBar.index + 1)
+
+                        currentSession.sellZone := false
+                        if not detectSweepsOncePerSession
+                            currentSession.sellSide := false
+
+            if asiaSessionTitle == asiaSessionTitle and newYorkAmSessionShow
+                lastPlotLow = currentSession.lowPrice
+
+                if not currentSession.lastSellSide
+
+                    if currentBar.low < lastPlotLow and currentBar.open > lastPlotLow
+                        alert(syminfo.ticker + ' sellside session level breached, price ' + str.tostring(currentBar.close, format.mintick) + ', timeframe ' + timeframe.period, alert.freq_once_per_bar)
+                        currentSession.lastSellZoneBox := box.new (currentBar.index - 1, lastPlotLow, currentBar.index + 1, math.max(lastPlotLow - sellSideSweepMargin * sweepAverageTrueRange, currentBar.low), bgcolor = sellSideSweepColor, border_color = color(na))
+                        sell_side_sweep := true
+
+                        currentSession.lastSellZone := true
+                        currentSession.lastSellSide := true
+
+                else if currentSession.lastSellZone
+
+                    if currentBar.low > lastPlotLow - sellSideSweepMargin * sweepAverageTrueRange and currentBar.high < lastPlotLow + sellSideSweepMargin * sweepAverageTrueRange
+                        currentSession.lastSellZoneBox.set_bottom(math.min(currentBar.low, currentSession.lastSellZoneBox.get_bottom()))
+
+                        if currentBar.low < lastPlotLow
+                            currentSession.lastSellZoneBox.set_right(currentBar.index + 1)
+                        na
+                    else
+                        if currentBar.close < lastPlotLow - sellSideSweepMargin * sweepAverageTrueRange * 1.5
+                            currentSession.lastSellZoneBox.set_bgcolor(hideFakeSweepZones ? color(na) : fakeSweepColor)
+                            currentSession.lastSellZoneBox.set_right(currentBar.index)
+                            currentSession.lastSellZone := false
+                        else if currentBar.index - currentSession.lastSellZoneBox.get_right() >= sweepMarginLength
+                            if currentBar.low < lastPlotLow - sellSideSweepMargin * sweepAverageTrueRange
+                                currentSession.lastSellZoneBox.set_bgcolor(hideFakeSweepZones ? color(na) : fakeSweepColor)
+                                currentSession.lastSellZoneBox.set_right(currentBar.index + 1)
+
+                            currentSession.lastSellZone := false
+                            if not detectSweepsOncePerSession
+                                currentSession.lastSellSide := false
+
 else
     var table note = table.new(position.bottom_right, 1, 1)
     if barstate.islast
@@ -629,18 +613,31 @@ if fairValueGapsShow
 //-----------------------------------------------------------------------------{
 
 
+// Variabile per tenere traccia dell'ultimo giorno eseguito
+var int lastExecutedDay = na
 
-if buy_side_sweep
-    if marketStructureShiftsBearish
-        strategy.entry("Short", strategy.short)
-        if bar_index == asiatic_session_low
-            strategy.close("Short")
-if sell_side_sweep
-    if marketStructureShiftsBullish
-        strategy.entry("Long", strategy.long)
-        if bar_index == asiatic_session_high
-            strategy.close("Long")
-        //strategy.exit("Stop Loss", "Long", stop=asiatic_session_low)
+// Ottieni il giorno corrente
+currentDay = dayofweek(time)
+
+// Controlla se il giorno corrente è diverso dall'ultimo giorno eseguito
+if (currentDay != lastExecutedDay)
+    if buy_side_sweep
+        if marketStructureShiftsBearish
+            strategy.entry("Short", strategy.short)
+            strategy.exit("Take Profit", "Short", limit=asiatic_session_low)
+            strategy.exit("Stop Loss", "Short", stop=asiatic_session_high)
+            lastExecutedDay := currentDay
+    if sell_side_sweep
+        if marketStructureShiftsBullish
+
+            strategy.entry("Long", strategy.long)
+            strategy.exit("Take Profit", "Long", limit=asiatic_session_high)
+            strategy.exit("Stop Loss", "Long", stop=asiatic_session_low)
+            lastExecutedDay := currentDay
+    label.new(bar_index, high, "Eseguito oggi", color=color.green, style=label.style_label_down)
+
+    // Aggiorna l'ultimo giorno eseguito
+    
 
 
 
