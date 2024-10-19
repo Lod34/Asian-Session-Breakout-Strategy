@@ -2,158 +2,167 @@
 // © LuxAlgo
 //@version=5
 
-indicator("Session Sweeps [LuxAlgo]", "LuxAlgo - Session Sweeps", overlay = true, max_boxes_count = 500, max_lines_count = 500)
+strategy("Asian Session Breakout", overlay = true, max_boxes_count = 500, max_lines_count = 500)
+
+var float asiatic_session_high = na
+var float asiatic_session_low = na
+var bool marketStructureShiftsBearish = false
+var bool marketStructureShiftsBullish = false
+var bool buy_side_sweep = false
+var bool sell_side_sweep = false
+
+
 
 //------------------------------------------------------------------------------
 // Settings
 //-----------------------------------------------------------------------------{
 
-swpGR = 'Session Sweeps'
-swpBZ = input.bool (true, 'Buyside Sweep Zones', inline = 'SWPB', group = swpGR)
-swpBC = input.color(color.new(color.orange, 37), '', inline = 'SWPB', group = swpGR)
-swpBM = input.float(1.3, 'Margin', minval = .5, maxval = 10, step = .1, inline = 'SWPB', group = swpGR)
+sessionSweepsGroup = 'Session Sweeps'
+showBuySideSweepZones = input.bool(true, 'Buyside Sweep Zones', inline = 'SWPB', group = sessionSweepsGroup)
+buySideSweepColor = input.color(color.new(color.orange, 37), '', inline = 'SWPB', group = sessionSweepsGroup)
+buySideSweepMargin = input.float(1.3, 'Margin', minval = .5, maxval = 10, step = .1, inline = 'SWPB', group = sessionSweepsGroup)
 
-swpSZ = input.bool (true, 'Sellside Sweep Zones', inline = 'SWPS', group = swpGR)
-swpSC = input.color(color.new(color.blue, 37), '', inline = 'SWPS', group = swpGR)
-swpSM = input.float(1.3, 'Margin', minval = .5, maxval = 10, step = .1, inline = 'SWPS', group = swpGR)
+showSellSideSweepZones = input.bool(true, 'Sellside Sweep Zones', inline = 'SWPS', group = sessionSweepsGroup)
+sellSideSweepColor = input.color(color.new(color.blue, 37), '', inline = 'SWPS', group = sessionSweepsGroup)
+sellSideSweepMargin = input.float(1.3, 'Margin', minval = .5, maxval = 10, step = .1, inline = 'SWPS', group = sessionSweepsGroup)
 
-swpML = input.int(5, '  Sweep Margin Length', minval = 2, maxval = 10, group = swpGR)
-swpDT = input.bool(false, 'Detect Sweeps Once per Session', group = swpGR)
+sweepMarginLength = input.int(5, '  Sweep Margin Length', minval = 2, maxval = 10, group = sessionSweepsGroup)
+detectSweepsOncePerSession = input.bool(false, 'Detect Sweeps Once per Session', group = sessionSweepsGroup)
 
-swpHF = input.bool(false, 'Hide Fake Sweep Zones', inline = 'SWPF', group = swpGR)
-swpFC = input.color(color.new(#787b86, 73), '', inline = 'SWPF', group = swpGR)
+hideFakeSweepZones = input.bool(false, 'Hide Fake Sweep Zones', inline = 'SWPF', group = sessionSweepsGroup)
+fakeSweepColor = input.color(color.new(#787b86, 73), '', inline = 'SWPF', group = sessionSweepsGroup)
 
-sesGR   = "Sessions"
-h01 = '01:00', h02 = '02:00', h03 = '03:00', h04 = '04:00', h05 = '05:00', h06 = '06:00'
-h07 = '07:00', h08 = '08:00', h09 = '09:00', h10 = '10:00', h11 = '11:00', h12 = '12:00'
-h13 = '13:00', h14 = '14:00', h15 = '15:00', h16 = '16:00', h17 = '17:00', h18 = '18:00'
-h19 = '19:00', h20 = '20:00', h21 = '21:00', h22 = '22:00', h23 = '23:00', h00 = '00:00'
+sessionsGroup = "Sessions"
+hour01 = '01:00', hour02 = '02:00', hour03 = '03:00', hour04 = '04:00', hour05 = '05:00', hour06 = '06:00'
+hour07 = '07:00', hour08 = '08:00', hour09 = '09:00', hour10 = '10:00', hour11 = '11:00', hour12 = '12:00'
+hour13 = '13:00', hour14 = '14:00', hour15 = '15:00', hour16 = '16:00', hour17 = '17:00', hour18 = '18:00'
+hour19 = '19:00', hour20 = '20:00', hour21 = '21:00', hour22 = '22:00', hour23 = '23:00', hour00 = '00:00'
 
-asSH    = input.bool(true , '', inline='AS' , group = sesGR)
-asST    = input.string('Asia' , '', inline='AS' , group = sesGR)
-asSRT   = input.string(h09, '' , options = [h00, h01, h02, h03, h04, h05, h06, h07, h08, h09, h10, h11, h12, h13, h14, h15, h16, h17, h18, h19, h20, h21, h22, h23], inline='AS', group = sesGR)
-asEND   = input.string(h18, '-', options = [h00, h01, h02, h03, h04, h05, h06, h07, h08, h09, h10, h11, h12, h13, h14, h15, h16, h17, h18, h19, h20, h21, h22, h23], inline='AS', group = sesGR)
-asC     = input.color(color.new(color.yellow, 0), '  ', inline='AS1', group = sesGR)
-asMMP   = input.bool (true, 'Extend : Max/Min | Mid', inline = 'AS1', group = sesGR)
-asSM    = input.bool(false , '', inline = 'AS1', group = sesGR)
-asBG    = input.bool (true, 'Fill', inline = 'AS1', group = sesGR)
+asiaSessionShow = input.bool(true , '', inline='AS' , group = sessionsGroup)
+asiaSessionTitle = input.string('Asia' , '', inline='AS' , group = sessionsGroup)
+asiaSessionStartTime = input.string(hour09, '' , options = [hour00, hour01, hour02, hour03, hour04, hour05, hour06, hour07, hour08, hour09, hour10, hour11, hour12, hour13, hour14, hour15, hour16, hour17, hour18, hour19, hour20, hour21, hour22, hour23], inline='AS', group = sessionsGroup)
+asiaSessionEndTime = input.string(hour18, '-', options = [hour00, hour01, hour02, hour03, hour04, hour05, hour06, hour07, hour08, hour09, hour10, hour11, hour12, hour13, hour14, hour15, hour16, hour17, hour18, hour19, hour20, hour21, hour22, hour23], inline='AS', group = sessionsGroup)
+asiaSessionColor = input.color(color.new(color.yellow, 0), '  ', inline='AS1', group = sessionsGroup)
+asiaSessionExtendMaxMinMid = input.bool(true, 'Extend : Max/Min | Mid', inline = 'AS1', group = sessionsGroup)
+asiaSessionShowMargin = input.bool(false , '', inline = 'AS1', group = sessionsGroup)
+asiaSessionFillBackground = input.bool(true, 'Fill', inline = 'AS1', group = sessionsGroup)
 
-ldnSH   = input.bool(true , ''  , inline='LDN' , group = sesGR)
-ldnST   = input.string('London' , '', inline='LDN' , group = sesGR)
-ldnSRT  = input.string(h08, '' , options = [h00, h01, h02, h03, h04, h05, h06, h07, h08, h09, h10, h11, h12, h13, h14, h15, h16, h17, h18, h19, h20, h21, h22, h23], inline='LDN', group = sesGR)
-ldnEND  = input.string(h17, '-', options = [h00, h01, h02, h03, h04, h05, h06, h07, h08, h09, h10, h11, h12, h13, h14, h15, h16, h17, h18, h19, h20, h21, h22, h23], inline='LDN', group = sesGR)
-ldnC    = input.color(color.new(color.blue, 0), '  ', inline='LDN1', group = sesGR)
-ldnMMP  = input.bool (true, 'Extend : Max/Min | Mid', inline = 'LDN1', group = sesGR)
-ldnSM   = input.bool(false , '', inline = 'LDN1', group = sesGR)
-ldnBG   = input.bool (true, 'Fill', inline = 'LDN1', group = sesGR)
+londonSessionShow = input.bool(true , ''  , inline='LDN' , group = sessionsGroup)
+londonSessionTitle = input.string('London' , '', inline='LDN' , group = sessionsGroup)
+londonSessionStartTime = input.string(hour08, '' , options = [hour00, hour01, hour02, hour03, hour04, hour05, hour06, hour07, hour08, hour09, hour10, hour11, hour12, hour13, hour14, hour15, hour16, hour17, hour18, hour19, hour20, hour21, hour22, hour23], inline='LDN', group = sessionsGroup)
+londonSessionEndTime = input.string(hour17, '-', options = [hour00, hour01, hour02, hour03, hour04, hour05, hour06, hour07, hour08, hour09, hour10, hour11, hour12, hour13, hour14, hour15, hour16, hour17, hour18, hour19, hour20, hour21, hour22, hour23], inline='LDN', group = sessionsGroup)
+londonSessionColor = input.color(color.new(color.blue, 0), '  ', inline='LDN1', group = sessionsGroup)
+londonSessionExtendMaxMinMid = input.bool(true, 'Extend : Max/Min | Mid', inline = 'LDN1', group = sessionsGroup)
+londonSessionShowMargin = input.bool(false , '', inline = 'LDN1', group = sessionsGroup)
+londonSessionFillBackground = input.bool(true, 'Fill', inline = 'LDN1', group = sessionsGroup)
 
-nyamSH  = input.bool(true , ''  , inline='NYA' , group = sesGR)
-nyamST  = input.string('NY AM' , '', inline='NYA' , group = sesGR)
-nyamSRT = input.string(h08, '' , options = [h00, h01, h02, h03, h04, h05, h06, h07, h08, h09, h10, h11, h12, h13, h14, h15, h16, h17, h18, h19, h20, h21, h22, h23], inline='NYA', group = sesGR)
-nyamEND = input.string(h13, '-', options = [h00, h01, h02, h03, h04, h05, h06, h07, h08, h09, h10, h11, h12, h13, h14, h15, h16, h17, h18, h19, h20, h21, h22, h23], inline='NYA', group = sesGR)
-nyamC   = input.color(color.new(color.orange, 0), '  ', inline='NYA1', group = sesGR)
-nyamMMP = input.bool (true, 'Extend : Max/Min | Mid', inline = 'NYA1', group = sesGR)
-nyamSM  = input.bool(false , '', inline = 'NYA1', group = sesGR)
-nyamBG  = input.bool (true, 'Fill', inline = 'NYA1', group = sesGR)
+newYorkAmSessionShow = input.bool(true , ''  , inline='NYA' , group = sessionsGroup)
+newYorkAmSessionTitle = input.string('NY AM' , '', inline='NYA' , group = sessionsGroup)
+newYorkAmSessionStartTime = input.string(hour08, '' , options = [hour00, hour01, hour02, hour03, hour04, hour05, hour06, hour07, hour08, hour09, hour10, hour11, hour12, hour13, hour14, hour15, hour16, hour17, hour18, hour19, hour20, hour21, hour22, hour23], inline='NYA', group = sessionsGroup)
+newYorkAmSessionEndTime = input.string(hour13, '-', options = [hour00, hour01, hour02, hour03, hour04, hour05, hour06, hour07, hour08, hour09, hour10, hour11, hour12, hour13, hour14, hour15, hour16, hour17, hour18, hour19, hour20, hour21, hour22, hour23], inline='NYA', group = sessionsGroup)
+newYorkAmSessionColor = input.color(color.new(color.orange, 0), '  ', inline='NYA1', group = sessionsGroup)
+newYorkAmSessionExtendMaxMinMid = input.bool(true, 'Extend : Max/Min | Mid', inline = 'NYA1', group = sessionsGroup)
+newYorkAmSessionShowMargin = input.bool(false , '', inline = 'NYA1', group = sessionsGroup)
+newYorkAmSessionFillBackground = input.bool(true, 'Fill', inline = 'NYA1', group = sessionsGroup)
 
-nypmSH  = input.bool(true , ''  , inline='NYP' , group = sesGR)
-nypmST  = input.string('NY PM' , '', inline='NYP' , group = sesGR)
-nypmSRT = input.string(h13, '' , options = [h00, h01, h02, h03, h04, h05, h06, h07, h08, h09, h10, h11, h12, h13, h14, h15, h16, h17, h18, h19, h20, h21, h22, h23], inline='NYP', group = sesGR)
-nypmEND = input.string(h19, '-', options = [h00, h01, h02, h03, h04, h05, h06, h07, h08, h09, h10, h11, h12, h13, h14, h15, h16, h17, h18, h19, h20, h21, h22, h23], inline='NYP', group = sesGR)
-nypmC   = input.color(color.new(color.red, 0), '  ', inline='NYP1', group = sesGR)
-nypmMMP = input.bool (true, 'Extend : Max/Min | Mid', inline = 'NYP1', group = sesGR)
-nypmSM  = input.bool(false, '', inline = 'NYP1', group = sesGR)
-nypmBG  = input.bool (true, 'Fill', inline = 'NYP1', group = sesGR)
+newYorkPmSessionShow = input.bool(true , ''  , inline='NYP' , group = sessionsGroup)
+newYorkPmSessionTitle = input.string('NY PM' , '', inline='NYP' , group = sessionsGroup)
+newYorkPmSessionStartTime = input.string(hour13, '' , options = [hour00, hour01, hour02, hour03, hour04, hour05, hour06, hour07, hour08, hour09, hour10, hour11, hour12, hour13, hour14, hour15, hour16, hour17, hour18, hour19, hour20, hour21, hour22, hour23], inline='NYP', group = sessionsGroup)
+newYorkPmSessionEndTime = input.string(hour19, '-', options = [hour00, hour01, hour02, hour03, hour04, hour05, hour06, hour07, hour08, hour09, hour10, hour11, hour12, hour13, hour14, hour15, hour16, hour17, hour18, hour19, hour20, hour21, hour22, hour23], inline='NYP', group = sessionsGroup)
+newYorkPmSessionColor = input.color(color.new(color.red, 0), '  ', inline='NYP1', group = sessionsGroup)
+newYorkPmSessionExtendMaxMinMid = input.bool(true, 'Extend : Max/Min | Mid', inline = 'NYP1', group = sessionsGroup)
+newYorkPmSessionShowMargin = input.bool(false, '', inline = 'NYP1', group = sessionsGroup)
+newYorkPmSessionFillBackground = input.bool(true, 'Fill', inline = 'NYP1', group = sessionsGroup)
 
-nyDST   = input.bool(false , 'New York DST | London DST', inline = 'DST', group = sesGR, tooltip = 'New York - Daylight Saving Time (DST)\n *DST Start : Second Sunday in March at 2:00\n *DST End : First Sunday in November at 2:00\n\nLondon - Daylight saving time (DST)\n *DST Start : Last Sunday in March at 1:00\n *DST End : Last Sunday in October at 1:00')
-ldnDST  = input.bool(false , '', inline = 'DST', group = sesGR)
+newYorkDaylightSavingTime = input.bool(false , 'New York DST | London DST', inline = 'DST', group = sessionsGroup, tooltip = 'New York - Daylight Saving Time (DST)\n *DST Start : Second Sunday in March at 2:00\n *DST End : First Sunday in November at 2:00\n\nLondon - Daylight saving time (DST)\n *DST Start : Last Sunday in March at 1:00\n *DST End : Last Sunday in October at 1:00')
+londonDaylightSavingTime = input.bool(false , '', inline = 'DST', group = sessionsGroup)
 
-sesDET  = input.bool(true , 'Sessions Extreme Lines | Sessions Names', inline = 'NAM', group = sesGR)
-sesNM   = input.bool(true , '', inline = 'NAM', group = sesGR)
-sesLNW  = input.int(1 , '  Session Lines Width', group = sesGR)
-sesFT   = input.int(95, '  Session Fill Transparency', minval = 0, maxval = 100, group = sesGR)
+sessionsExtremeLines = input.bool(true , 'Sessions Extreme Lines | Sessions Names', inline = 'NAM', group = sessionsGroup)
+sessionsNames = input.bool(true , '', inline = 'NAM', group = sessionsGroup)
+sessionsLinesWidth = input.int(1 , '  Session Lines Width', group = sessionsGroup)
+sessionsFillTransparency = input.int(95, '  Session Fill Transparency', minval = 0, maxval = 100, group = sessionsGroup)
 
-mssGR   = 'Market Structure Shifts'
-mssSH   = input.bool(false, 'Market Structure Shifts', group = mssGR)
-mssLN   = input.int(8, "Detection Length", minval = 1, group = mssGR)
-ppLCB   = input.color(color.new(color.teal, 0), 'Market Structure Shifts : Bullish', inline = 'MSS', group = mssGR)
-ppLCS   = input.color(color.new(color.red, 0), 'Bearish', inline = 'MSS', group = mssGR)
+marketStructureShiftsGroup = 'Market Structure Shifts'
+marketStructureShiftsShow = input.bool(false, 'Market Structure Shifts', group = marketStructureShiftsGroup)
+marketStructureShiftsDetectionLength = input.int(8, "Detection Length", minval = 1, group = marketStructureShiftsGroup)
+marketStructureShiftsBullishColor = input.color(color.new(color.teal, 0), 'Market Structure Shifts : Bullish', inline = 'MSS', group = marketStructureShiftsGroup)
+marketStructureShiftsBearishColor = input.color(color.new(color.red, 0), 'Bearish', inline = 'MSS', group = marketStructureShiftsGroup)
 
-fvgGR   = 'Fair Value Gaps'
-fvgSH   = input.bool(false, 'Fair Value Gaps', group = fvgGR)
-fvgTT   = 'The script displays the fair value gaps whose width is larger than a fixed-length atr (average true range) value multiplied by the value of the option.\n\n' + 
+fairValueGapsGroup = 'Fair Value Gaps'
+fairValueGapsShow = input.bool(false, 'Fair Value Gaps', group = fairValueGapsGroup)
+fairValueGapsTooltip = 'The script displays the fair value gaps whose width is larger than a fixed-length atr (average true range) value multiplied by the value of the option.\n\n' + 
          'The option value set to 0 means no filtering is applied.\n\n' + 
          'Remark: no filtering will be applied for the first 144 (atr fixed-length) candles since the atr value won\'t be present'
-fvgTH   = input.float(1, 'Fair Value Gap Width Filter', minval = 0, step = .1, tooltip = fvgTT, group = fvgGR)
+fairValueGapsWidthFilter = input.float(1, 'Fair Value Gap Width Filter', minval = 0, step = .1, tooltip = fairValueGapsTooltip, group = fairValueGapsGroup)
 
-fvgBC   = input.color(color.new(color.teal, 80), 'Bullish Imbalance', inline = 'FVG', group = fvgGR)
-fvgSC   = input.color(color.new(color.red, 80), 'Bearish Imbalance', inline = 'FVG', group = fvgGR)
+fairValueGapsBullishColor = input.color(color.new(color.teal, 80), 'Bullish Imbalance', inline = 'FVG', group = fairValueGapsGroup)
+fairValueGapsBearishColor = input.color(color.new(color.red, 80), 'Bearish Imbalance', inline = 'FVG', group = fairValueGapsGroup)
 
-sesOTH  = 'Sessions Tabular View'
-sesTSH  = input.bool(true , 'Sessions Tabular View'  , group = sesOTH, tooltip = 'Displays sessions tabular view\n - Date and Time,\n - Sessions Opening/Closing Countdown Timer and\n - Session Status')
-hIfN    = input.bool(false, 'Hide if not Forex Market Instrument'  , group = sesOTH)
-sesTS   = input.string("Small", "  Table Text Size", options = [ "Tiny", "Small", "Normal"], inline='STAT',group = sesOTH)
-sesTS  := sesTS == "Small" ? size.small : sesTS == "Normal" ? size.normal : size.tiny
-sesPOS  = input.string('Top Right', '', options = ['Top Left', 'Top Center', 'Top Right', 'Middle Right', 'Bottom Left', 'Bottom Center'], inline='STAT', group = sesOTH) 
+sessionsTabularViewGroup = 'Sessions Tabular View'
+sessionsTabularViewShow = input.bool(true , 'Sessions Tabular View'  , group = sessionsTabularViewGroup, tooltip = 'Displays sessions tabular view\n - Date and Time,\n - Sessions Opening/Closing Countdown Timer and\n - Session Status')
+hideIfNotForexMarketInstrument = input.bool(false, 'Hide if not Forex Market Instrument'  , group = sessionsTabularViewGroup)
+sessionsTabularViewTableTextSize = input.string("Small", "  Table Text Size", options = [ "Tiny", "Small", "Normal"], inline='STAT',group = sessionsTabularViewGroup)
+sessionsTabularViewTableTextSize := sessionsTabularViewTableTextSize == "Small" ? size.small : sessionsTabularViewTableTextSize == "Normal" ? size.normal : size.tiny
+sessionsTabularViewPosition = input.string('Top Right', '', options = ['Top Left', 'Top Center', 'Top Right', 'Middle Right', 'Bottom Left', 'Bottom Center'], inline='STAT', group = sessionsTabularViewGroup) 
 
 //-----------------------------------------------------------------------------}
 // User Defined Types
 //-----------------------------------------------------------------------------{
 
-type bar
-    float o = open
-    float h = high
-    float l = low
-    float c = close
-    int   i = bar_index
+type Bar
+    float open = open
+    float high = high
+    float low = low
+    float close = close
+    int   index = bar_index
 
-type session 
-    string  []  s
-    float   []  oH
-    float   []  cH
-    int     []  tO
+type Session 
+    string  []  titles
+    float   []  openHours
+    float   []  closeHours
+    int     []  timeOffsets
 
-    line        lnSHp
-    line        lnSMp
-    line        lnSLp
-    float       fSHp
-    float       fSLp
+    line        highLine
+    line        midLine
+    line        lowLine
+    float       highPrice
+    float       lowPrice
 
-    box         bzBX
-    box         szBX
-    bool        bzB
-    bool        bsB
-    bool        szB
-    bool        ssB
+    box         buyZoneBox
+    box         sellZoneBox
+    bool        buyZone
+    bool        buySide
+    bool        sellZone
+    bool        sellSide
 
-    box         lbzBX
-    box         lszBX
-    bool        lbzB
-    bool        lbsB
-    bool        lszB
-    bool        lssB
+    box         lastBuyZoneBox
+    box         lastSellZoneBox
+    bool        lastBuyZone
+    bool        lastBuySide
+    bool        lastSellZone
+    bool        lastSellSide
 
-type pivotPoint
-    float  h
-    int    ht
-    bool   hx 
+type PivotPoint
+    float  high
+    int    highTime
+    bool   highCrossed 
 
-    float  l
-    int    lt
-    bool   lx
+    float  low
+    int    lowTime
+    bool   lowCrossed
 
-type FVG
-    box  [] uFVG
+type FairValueGap
+    box  [] upperFairValueGaps
 
 //-----------------------------------------------------------------------------}
 // Variables
 //-----------------------------------------------------------------------------{
 
-bar b = bar.new()
+Bar currentBar = Bar.new()
 
-tfM = timeframe.multiplier
+timeframeMultiplier = timeframe.multiplier
 
-var session S = session.new(
+var Session currentSession = Session.new(
      array.new <string>  (na),
      array.new <float>   (na),
      array.new <float>   (na),
@@ -163,326 +172,333 @@ var session S = session.new(
      box(na), box(na), 
      false, false, false, false
  )
+sweepAverageTrueRange = ta.atr(21)
 
-swpATR = ta.atr(21)
-
-var pivotPoint pp = pivotPoint.new()
+var PivotPoint currentPivotPoint = PivotPoint.new()
 var shift = 0
 
-var FVG fvg = FVG.new(array.new <box>  (na))
-fvgATR = nz(ta.atr(144)) * fvgTH
+var FairValueGap currentFairValueGap = FairValueGap.new(array.new <box>  (na))
+fairValueGapAverageTrueRange = nz(ta.atr(144)) * fairValueGapsWidthFilter
 var bool last = na 
 
 if barstate.isfirst 
-    S.s.push('Asia')  , S.oH.push(09), S.cH.push(14), S.tO.push(09)
-    S.s.push('London'), S.oH.push(05), S.cH.push(13), S.tO.push(00)
-    S.s.push('NY AM') , S.oH.push(08), S.cH.push(13), S.tO.push(-5)
-    S.s.push('NY PM') , S.oH.push(13), S.cH.push(19), S.tO.push(-5)
+    currentSession.titles.push('Asia')  , currentSession.openHours.push(09), currentSession.closeHours.push(14), currentSession.timeOffsets.push(09)
+    currentSession.titles.push('London'), currentSession.openHours.push(05), currentSession.closeHours.push(13), currentSession.timeOffsets.push(00)
+    currentSession.titles.push('NY AM') , currentSession.openHours.push(08), currentSession.closeHours.push(13), currentSession.timeOffsets.push(-5)
+    currentSession.titles.push('NY PM') , currentSession.openHours.push(13), currentSession.closeHours.push(19), currentSession.timeOffsets.push(-5)
 
 //-----------------------------------------------------------------------------}
 // Functions / Methods
 //-----------------------------------------------------------------------------{
 
-f_whatIsTheTime(_ses, _dst) =>
-    TZ = 'Etc/UTC'
-    DST = _dst ? 1 : 0
-    utcTime = (S.tO.get(S.s.indexof(_ses)) + DST) * 3600000 + timenow
-    [math.floor(utcTime / 3600000) % 24, math.floor(utcTime / 60000) % 60, math.floor(utcTime / 1000) % 60, dayofmonth(int(utcTime), TZ), month(int(utcTime), TZ), year(int(utcTime), TZ), dayofweek(int(utcTime), TZ)]
+whatIsTheTime(_session, _dst) =>
+    timeZone = 'Etc/UTC'
+    daylightSavingTime = _dst ? 1 : 0
+    utcTime = (currentSession.timeOffsets.get(currentSession.titles.indexof(_session)) + daylightSavingTime) * 3600000 + timenow
+    [math.floor(utcTime / 3600000) % 24, math.floor(utcTime / 60000) % 60, math.floor(utcTime / 1000) % 60, dayofmonth(int(utcTime), timeZone), month(int(utcTime), timeZone), year(int(utcTime), timeZone), dayofweek(int(utcTime), timeZone)]
 
-f_sesDet(_ses, _dst) =>
-    [h, m, s, D, M, Y, A] = f_whatIsTheTime(_ses, _dst)
+sessionDetection(_session, _dst) =>
+    [h, m, s, D, M, Y, dayOfWeek] = whatIsTheTime(_session, _dst)
 
-    ht = h < 10 ? '0' + str.tostring(h) : str.tostring(h)
-    mt = m < 10 ? '0' + str.tostring(m) : str.tostring(m)
-    st = s < 10 ? '0' + str.tostring(s) : str.tostring(s)
-    Dt = D < 10 ? '0' + str.tostring(D) : str.tostring(D)
-    Mt = M < 10 ? '0' + str.tostring(M) : str.tostring(M)
-    Yt = str.tostring(Y)
-    dateTime = Dt + '/' + Mt + '/' + Yt + '-' + ht + ':' + mt + ':' + st
+    hourText = h < 10 ? '0' + str.tostring(h) : str.tostring(h)
+    minuteText = m < 10 ? '0' + str.tostring(m) : str.tostring(m)
+    secondText = s < 10 ? '0' + str.tostring(s) : str.tostring(s)
+    dayText = D < 10 ? '0' + str.tostring(D) : str.tostring(D)
+    monthText = M < 10 ? '0' + str.tostring(M) : str.tostring(M)
+    yearText = str.tostring(Y)
+    dateTime = dayText + '/' + monthText + '/' + yearText + '-' + hourText + ':' + minuteText + ':' + secondText
 
-    if A != 1 and A != 7
-        SoH = S.oH.get(S.s.indexof(_ses))
-        ScH = S.cH.get(S.s.indexof(_ses))
-        market = if h >= SoH and h < ScH
-            hc = ScH - h - 1
-            mc = 60 - m - 1
-            sc = 60 - s
-            sct = sc < 10 ? '0' + str.tostring(sc) : str.tostring(sc)
-            mct = mc < 10 ? '0' + str.tostring(mc) : str.tostring(mc)
-            hct = hc < 10 ? '0' + str.tostring(hc) : str.tostring(hc)
-            closes = hct + ':' + mct + ':' + sct
-            if hc == 0
-                sc % 2 == 0 ? dateTime + ' 🟢 Closes in ' + closes : dateTime + ' 🔴 Closes in ' + closes
+    if dayOfWeek != 1 and dayOfWeek != 7
+        sessionOpenHour = currentSession.openHours.get(currentSession.titles.indexof(_session))
+        sessionCloseHour = currentSession.closeHours.get(currentSession.titles.indexof(_session))
+        market = if h >= sessionOpenHour and h < sessionCloseHour
+            hourCountdown = sessionCloseHour - h - 1
+            minuteCountdown = 60 - m - 1
+            secondCountdown = 60 - s
+            secondCountdownText = secondCountdown < 10 ? '0' + str.tostring(secondCountdown) : str.tostring(secondCountdown)
+            minuteCountdownText = minuteCountdown < 10 ? '0' + str.tostring(minuteCountdown) : str.tostring(minuteCountdown)
+            hourCountdownText = hourCountdown < 10 ? '0' + str.tostring(hourCountdown) : str.tostring(hourCountdown)
+            closes = hourCountdownText + ':' + minuteCountdownText + ':' + secondCountdownText
+            if hourCountdown == 0
+                secondCountdown % 2 == 0 ? dateTime + ' 🟢 Closes in ' + closes : dateTime + ' 🔴 Closes in ' + closes
             else
                 dateTime + ' 🟢 Closes in ' + closes
         else
-            ho = if h < SoH
-                SoH - h - 1
+            hourOffset = if h < sessionOpenHour
+                sessionOpenHour - h - 1
             else
-                24 - h + SoH - 1
-            mo = 60 - m - 1
-            so = 60 - s
-            sot = so < 10 ? '0' + str.tostring(so) : str.tostring(so)
-            mot = mo < 10 ? '0' + str.tostring(mo) : str.tostring(mo)
-            hot = ho < 10 ? '0' + str.tostring(ho) : str.tostring(ho)
-            opens = hot + ':' + mot + ':' + sot
-            if h >= ScH and A == 6
+                24 - h + sessionOpenHour - 1
+            minuteOffset = 60 - m - 1
+            secondOffset = 60 - s
+            secondOffsetText = secondOffset < 10 ? '0' + str.tostring(secondOffset) : str.tostring(secondOffset)
+            minuteOffsetText = minuteOffset < 10 ? '0' + str.tostring(minuteOffset) : str.tostring(minuteOffset)
+            hourOffsetText = hourOffset < 10 ? '0' + str.tostring(hourOffset) : str.tostring(hourOffset)
+            opens = hourOffsetText + ':' + minuteOffsetText + ':' + secondOffsetText
+            if h >= sessionCloseHour and dayOfWeek == 6
                 dateTime + ' 🟠 Weekend'
             else
-                if ho == 0
-                    so % 2 == 0 ? dateTime + ' 🔴 Opens in ' + opens : dateTime + ' 🟢 Opens in ' + opens
+                if hourOffset == 0
+                    secondOffset % 2 == 0 ? dateTime + ' 🔴 Opens in ' + opens : dateTime + ' 🟢 Opens in ' + opens
                 else
                     dateTime + ' 🔴 Opens in ' + opens
         market
     else
         dateTime + ' 🟠 Weekend'
 
-f_gSesI( _ses, _dst) =>
-    TZ  = 'Etc/UTC'
-    DST = _dst ? 1 : 0
-    SES = S.s.indexof(_ses)
-    utcTime = (S.tO.get(SES) + DST) * 3600000 + time
+isSession(_session, _dst) =>
+    timeZone  = 'Etc/UTC'
+    daylightSavingTime = _dst ? 1 : 0
+    sessionIndex = currentSession.titles.indexof(_session)
+    utcTime = (currentSession.timeOffsets.get(sessionIndex) + daylightSavingTime) * 3600000 + time
     h = math.floor(utcTime / 3600000) % 24
 
-    h >= S.oH.get(SES) and h < S.cH.get(SES)
+    h >= currentSession.openHours.get(sessionIndex) and h < currentSession.closeHours.get(sessionIndex)
 
-f_pSWP(_show, _cSes, _sSes, _dst, _cC, _mm, _bg, _sM) =>
-    var line lnSHc = na, var line lnSLc = na, var box bxSTc = na
-    var line llnSHc = na, var line llnSLc = na, var line llnSMc = na
+plotSession(_show, _currentSession, _session, _dst, _color, _extendMaxMinMid, _fillBackground, _showMargin) =>
+    var line highLine = na, var line lowLine = na, var box sessionBox = na
+    var line lastHighLine = na, var line lastLowLine = na, var line lastMidLine = na
 
     if _show 
-        cSES = f_gSesI(_cSes, _dst)
+        isCurrentSession = isSession(_currentSession, _dst)
 
-        if cSES and cSES != cSES[1]
-            lnSHc := line.new(b.i, b.h, b.i, b.h, xloc.bar_index, extend.none, color.new(_cC, sesDET ? 0 : sesFT), line.style_solid, sesLNW)
-            lnSLc := line.new(b.i, b.l, b.i, b.l, xloc.bar_index, extend.none, color.new(_cC, sesDET ? 0 : sesFT), line.style_solid, sesLNW)
+        if isCurrentSession and isCurrentSession != isCurrentSession[1]
+            highLine := line.new(currentBar.index, currentBar.high, currentBar.index, currentBar.high, xloc.bar_index, extend.none, color.new(_color, sessionsExtremeLines ? 0 : sessionsFillTransparency), line.style_solid, sessionsLinesWidth)
+            lowLine := line.new(currentBar.index, currentBar.low, currentBar.index, currentBar.low, xloc.bar_index, extend.none, color.new(_color, sessionsExtremeLines ? 0 : sessionsFillTransparency), line.style_solid, sessionsLinesWidth)
            
-            if _bg
-                linefill.new(lnSHc, lnSLc, color.new(_cC, sesFT))
+            if _currentSession == asiaSessionTitle
+                asiatic_session_high = currentBar.high
+                asiatic_session_low = currentBar.low
 
-            if sesNM
-                bxSTc := box.new (b.i, b.l, b.i, b.l, text = _cSes, text_size = size.tiny, text_halign = text.align_left, text_valign = text.align_top, 
-                               text_color = color.new(_cC, 25), bgcolor = color(na), border_color = color(na))
+            if _fillBackground
+                linefill.new(highLine, lowLine, color.new(_color, sessionsFillTransparency))
 
-        if cSES
-            lnSHc.set_y1(math.max(b.h, lnSHc.get_y1())), lnSHc.set_y2(math.max(b.h, lnSHc.get_y2())), lnSHc.set_x2(b.i)
-            lnSLc.set_y1(math.min(b.l, lnSLc.get_y1())), lnSLc.set_y2(math.min(b.l, lnSLc.get_y2())), lnSLc.set_x2(b.i)
+            if sessionsNames
+                sessionBox := box.new (currentBar.index, currentBar.low, currentBar.index, currentBar.low, text = _currentSession, text_size = size.tiny, text_halign = text.align_left, text_valign = text.align_top, 
+                               text_color = color.new(_color, 25), bgcolor = color(na), border_color = color(na))
 
-            if sesNM
-                bxSTc.set_bottom(math.min(b.l, lnSLc.get_y1())), bxSTc.set_top(math.min(b.l, lnSLc.get_y1()))
+        if isCurrentSession
+            highLine.set_y1(math.max(currentBar.high, highLine.get_y1())), highLine.set_y2(math.max(currentBar.high, highLine.get_y2())), highLine.set_x2(currentBar.index)
+            lowLine.set_y1(math.min(currentBar.low, lowLine.get_y1())), lowLine.set_y2(math.min(currentBar.low, lowLine.get_y2())), lowLine.set_x2(currentBar.index)
 
-        if not cSES and cSES != cSES[1]
-            S.lnSHp := line.new(b.i - 1, lnSHc.get_y1(), b.i, lnSHc.get_y2(), xloc.bar_index, extend.none, _mm ? _cC : color(na), line.style_dotted, sesLNW)
-            S.lnSMp := line.new(b.i - 1, math.avg(lnSHc.get_y1(), lnSLc.get_y1()), b.i, math.avg(lnSHc.get_y2(), lnSLc.get_y2()), xloc.bar_index, extend.none, _sM ? _cC : color(na), line.style_dotted, sesLNW)
-            S.lnSLp := line.new(b.i - 1, lnSLc.get_y1(), b.i, lnSLc.get_y2(), xloc.bar_index, extend.none, _mm ? _cC : color(na), line.style_dotted, sesLNW)
+            if sessionsNames
+                sessionBox.set_bottom(math.min(currentBar.low, lowLine.get_y1())), sessionBox.set_top(math.min(currentBar.low, lowLine.get_y1()))
 
-            S.bsB := false, S.bzB := false
-            S.ssB := false, S.szB := false
+        if not isCurrentSession and isCurrentSession != isCurrentSession[1]
+            currentSession.highLine := line.new(currentBar.index - 1, highLine.get_y1(), currentBar.index, highLine.get_y2(), xloc.bar_index, extend.none, _extendMaxMinMid ? _color : color(na), line.style_dotted, sessionsLinesWidth)
+            currentSession.midLine := line.new(currentBar.index - 1, math.avg(highLine.get_y1(), lowLine.get_y1()), currentBar.index, math.avg(highLine.get_y2(), lowLine.get_y2()), xloc.bar_index, extend.none, _showMargin ? _color : color(na), line.style_dotted, sessionsLinesWidth)
+            currentSession.lowLine := line.new(currentBar.index - 1, lowLine.get_y1(), currentBar.index, lowLine.get_y2(), xloc.bar_index, extend.none, _extendMaxMinMid ? _color : color(na), line.style_dotted, sessionsLinesWidth)
 
-            if _cSes == ldnST and nyamSH
-                S.fSHp := lnSHc.get_y1()
-                S.fSLp := lnSLc.get_y1()
-                llnSHc := line.new(b.i - 1, S.fSHp, b.i, S.fSHp, xloc.bar_index, extend.none, _mm ? _cC : color(na), line.style_dotted, sesLNW)
-                llnSMc := line.new(b.i - 1, math.avg(S.fSHp, S.fSLp), b.i, math.avg(S.fSHp, S.fSLp), xloc.bar_index, extend.none, _sM ? _cC : color(na), line.style_dotted, sesLNW)
-                llnSLc := line.new(b.i - 1, S.fSLp, b.i, S.fSLp, xloc.bar_index, extend.none, _mm ? _cC : color(na), line.style_dotted, sesLNW)
-                S.lbsB := false, S.lbzB := false
-                S.lssB := false, S.lszB := false
-            else if _cSes == nypmST
-                S.fSHp := 10e6
-                S.fSLp := 0
+            currentSession.buySide := false, currentSession.buyZone := false
+            currentSession.sellSide := false, currentSession.sellZone := false
 
-        if not cSES
-            S.lnSHp.set_x2(b.i - 1)
-            S.lnSMp.set_x2(b.i - 1)
-            S.lnSLp.set_x2(b.i - 1)
+            if _currentSession == londonSessionTitle and newYorkAmSessionShow
+                currentSession.highPrice := highLine.get_y1()
+                currentSession.lowPrice := lowLine.get_y1()
+                lastHighLine := line.new(currentBar.index - 1, currentSession.highPrice, currentBar.index, currentSession.highPrice, xloc.bar_index, extend.none, _extendMaxMinMid ? _color : color(na), line.style_dotted, sessionsLinesWidth)
+                lastMidLine := line.new(currentBar.index - 1, math.avg(currentSession.highPrice, currentSession.lowPrice), currentBar.index, math.avg(currentSession.highPrice, currentSession.lowPrice), xloc.bar_index, extend.none, _showMargin ? _color : color(na), line.style_dotted, sessionsLinesWidth)
+                lastLowLine := line.new(currentBar.index - 1, currentSession.lowPrice, currentBar.index, currentSession.lowPrice, xloc.bar_index, extend.none, _extendMaxMinMid ? _color : color(na), line.style_dotted, sessionsLinesWidth)
+                currentSession.lastBuySide := false, currentSession.lastBuyZone := false
+                currentSession.lastSellSide := false, currentSession.lastSellZone := false
+            else if _currentSession == newYorkPmSessionTitle
+                currentSession.highPrice := 10e6
+                currentSession.lowPrice := 0
 
-            if _cSes == ldnST and S.fSLp != 0
-                llnSHc.set_x2(b.i - 1)
-                llnSMc.set_x2(b.i - 1)
-                llnSLc.set_x2(b.i - 1)
+        if not isCurrentSession
+            currentSession.highLine.set_x2(currentBar.index - 1)
+            currentSession.midLine.set_x2(currentBar.index - 1)
+            currentSession.lowLine.set_x2(currentBar.index - 1)
 
-    if swpBZ
-        pSH = S.lnSHp.get_y1()
+            if _currentSession == londonSessionTitle and currentSession.lowPrice != 0
+                lastHighLine.set_x2(currentBar.index - 1)
+                lastMidLine.set_x2(currentBar.index - 1)
+                lastLowLine.set_x2(currentBar.index - 1)
 
-        if not S.bsB
+    if showBuySideSweepZones
+        plotHigh = currentSession.highLine.get_y1()
 
-            if b.h > pSH and b.o < pSH
-                alert(syminfo.ticker + ' buyside session level breached, price ' + str.tostring(b.c, format.mintick) + ', timeframe ' + timeframe.period, alert.freq_once_per_bar)
-                S.bzBX := box.new (b.i - 1, math.min(pSH + swpBM * swpATR, b.h), b.i + 1, pSH, bgcolor = swpBC, border_color = color(na))
+        if not currentSession.buySide
 
-                S.bzB := true
-                S.bsB := true
+            if currentBar.high > plotHigh and currentBar.open < plotHigh
+                alert(syminfo.ticker + ' buyside session level breached, price ' + str.tostring(currentBar.close, format.mintick) + ', timeframe ' + timeframe.period, alert.freq_once_per_bar)
+                currentSession.buyZoneBox := box.new (currentBar.index - 1, math.min(plotHigh + buySideSweepMargin * sweepAverageTrueRange, currentBar.high), currentBar.index + 1, plotHigh, bgcolor = buySideSweepColor, border_color = color(na))
+                buy_side_sweep = true
 
-        else if S.bzB
+                currentSession.buyZone := true
+                currentSession.buySide := true
 
-            if b.l > pSH - swpBM * swpATR and b.h < pSH + swpBM * swpATR
-                S.bzBX.set_top(math.max(b.h, S.bzBX.get_top()))
+        else if currentSession.buyZone
 
-                if b.h > pSH
-                    S.bzBX.set_right(b.i + 1)
+            if currentBar.low > plotHigh - buySideSweepMargin * sweepAverageTrueRange and currentBar.high < plotHigh + buySideSweepMargin * sweepAverageTrueRange
+                currentSession.buyZoneBox.set_top(math.max(currentBar.high, currentSession.buyZoneBox.get_top()))
+
+                if currentBar.high > plotHigh
+                    currentSession.buyZoneBox.set_right(currentBar.index + 1)
                 na
             else
-                if b.c > pSH + swpBM * swpATR * 1.5
-                    S.bzBX.set_bgcolor(swpHF ? color(na) : swpFC)
-                    S.bzBX.set_right(b.i)
-                    S.bzB := false
-                else if b.i - S.bzBX.get_right() >= swpML
-                    if b.h > pSH + swpBM * swpATR
-                        S.bzBX.set_bgcolor(swpHF ? color(na) : swpFC)
-                        S.bzBX.set_right(b.i + 1)
+                if currentBar.close > plotHigh + buySideSweepMargin * sweepAverageTrueRange * 1.5
+                    currentSession.buyZoneBox.set_bgcolor(hideFakeSweepZones ? color(na) : fakeSweepColor)
+                    currentSession.buyZoneBox.set_right(currentBar.index)
+                    currentSession.buyZone := false
+                else if currentBar.index - currentSession.buyZoneBox.get_right() >= sweepMarginLength
+                    if currentBar.high > plotHigh + buySideSweepMargin * sweepAverageTrueRange
+                        currentSession.buyZoneBox.set_bgcolor(hideFakeSweepZones ? color(na) : fakeSweepColor)
+                        currentSession.buyZoneBox.set_right(currentBar.index + 1)
 
-                    S.bzB := false
-                    if not swpDT
-                        S.bsB := false
+                    currentSession.buyZone := false
+                    if not detectSweepsOncePerSession
+                        currentSession.buySide := false
 
-        if _cSes == ldnST and nyamSH
-            lpSH = S.fSHp
+        if _currentSession == londonSessionTitle and newYorkAmSessionShow 
+            lastPlotHigh = currentSession.highPrice
 
-            if not S.lbsB
+            if not currentSession.lastBuySide
 
-                if b.h > lpSH and b.o < lpSH
-                    alert(syminfo.ticker + ' buyside session level breached, price ' + str.tostring(b.c, format.mintick) + ', timeframe ' + timeframe.period, alert.freq_once_per_bar)
-                    S.lbzBX := box.new (b.i - 1, math.min(lpSH + swpBM * swpATR, b.h), b.i + 1, lpSH, bgcolor = swpBC, border_color = color(na))
+                if currentBar.high > lastPlotHigh and currentBar.open < lastPlotHigh
+                    alert(syminfo.ticker + ' buyside session level breached, price ' + str.tostring(currentBar.close, format.mintick) + ', timeframe ' + timeframe.period, alert.freq_once_per_bar)
+                    currentSession.lastBuyZoneBox := box.new (currentBar.index - 1, math.min(lastPlotHigh + buySideSweepMargin * sweepAverageTrueRange, currentBar.high), currentBar.index + 1, lastPlotHigh, bgcolor = buySideSweepColor, border_color = color(na))
+                    buy_side_sweep = true
 
-                    S.lbzB := true
-                    S.lbsB := true
+                    currentSession.lastBuyZone := true
+                    currentSession.lastBuySide := true
 
-            else if S.lbzB
+            else if currentSession.lastBuyZone
 
-                if b.l > lpSH - swpBM * swpATR and b.h < lpSH + swpBM * swpATR
-                    S.lbzBX.set_top(math.max(b.h, S.lbzBX.get_top()))
+                if currentBar.low > lastPlotHigh - buySideSweepMargin * sweepAverageTrueRange and currentBar.high < lastPlotHigh + buySideSweepMargin * sweepAverageTrueRange
+                    currentSession.lastBuyZoneBox.set_top(math.max(currentBar.high, currentSession.lastBuyZoneBox.get_top()))
 
-                    if b.h > lpSH
-                        S.lbzBX.set_right(b.i + 1)
+                    if currentBar.high > lastPlotHigh
+                        currentSession.lastBuyZoneBox.set_right(currentBar.index + 1)
                     na
                 else
-                    if b.c > lpSH + swpBM * swpATR * 1.5
-                        S.lbzBX.set_bgcolor(swpHF ? color(na) : swpFC)
-                        S.lbzBX.set_right(b.i)
-                        S.lbzB := false
-                    else if b.i - S.lbzBX.get_right() >= swpML
-                        if b.h > lpSH + swpBM * swpATR
-                            S.lbzBX.set_bgcolor(swpHF ? color(na) : swpFC)
-                            S.lbzBX.set_right(b.i + 1)
+                    if currentBar.close > lastPlotHigh + buySideSweepMargin * sweepAverageTrueRange * 1.5
+                        currentSession.lastBuyZoneBox.set_bgcolor(hideFakeSweepZones ? color(na) : fakeSweepColor)
+                        currentSession.lastBuyZoneBox.set_right(currentBar.index)
+                        currentSession.lastBuyZone := false
+                    else if currentBar.index - currentSession.lastBuyZoneBox.get_right() >= sweepMarginLength
+                        if currentBar.high > lastPlotHigh + buySideSweepMargin * sweepAverageTrueRange
+                            currentSession.lastBuyZoneBox.set_bgcolor(hideFakeSweepZones ? color(na) : fakeSweepColor)
+                            currentSession.lastBuyZoneBox.set_right(currentBar.index + 1)
 
-                        S.lbzB := false
-                        if not swpDT
-                            S.lbsB := false
+                        currentSession.lastBuyZone := false
+                        if not detectSweepsOncePerSession
+                            currentSession.lastBuySide := false
 
-    if swpSZ
-        pSL = S.lnSLp.get_y1()
+    if showSellSideSweepZones
+        plotLow = currentSession.lowLine.get_y1()
 
-        if not S.ssB
+        if not currentSession.sellSide
 
-            if b.l < pSL and b.o > pSL
-                alert(syminfo.ticker + ' sellside session level breached, price ' + str.tostring(b.c, format.mintick) + ', timeframe ' + timeframe.period, alert.freq_once_per_bar)
-                S.szBX := box.new (b.i - 1, pSL, b.i + 1, math.max(pSL - swpSM * swpATR, b.l), bgcolor = swpSC, border_color = color(na))
+            if currentBar.low < plotLow and currentBar.open > plotLow
+                alert(syminfo.ticker + ' sellside session level breached, price ' + str.tostring(currentBar.close, format.mintick) + ', timeframe ' + timeframe.period, alert.freq_once_per_bar)
+                currentSession.sellZoneBox := box.new (currentBar.index - 1, plotLow, currentBar.index + 1, math.max(plotLow - sellSideSweepMargin * sweepAverageTrueRange, currentBar.low), bgcolor = sellSideSweepColor, border_color = color(na))
+                sell_side_sweep = true
 
-                S.szB := true
-                S.ssB := true
+                currentSession.sellZone := true
+                currentSession.sellSide := true
 
-        else if S.szB
+        else if currentSession.sellZone
 
-            if b.l > pSL - swpSM * swpATR and b.h < pSL + swpSM * swpATR
-                S.szBX.set_bottom(math.min(b.l, S.szBX.get_bottom()))
+            if currentBar.low > plotLow - sellSideSweepMargin * sweepAverageTrueRange and currentBar.high < plotLow + sellSideSweepMargin * sweepAverageTrueRange
+                currentSession.sellZoneBox.set_bottom(math.min(currentBar.low, currentSession.sellZoneBox.get_bottom()))
 
-                if b.l < pSL
-                    S.szBX.set_right(b.i + 1)
+                if currentBar.low < plotLow
+                    currentSession.sellZoneBox.set_right(currentBar.index + 1)
                 na
             else
-                if b.c < pSL - swpSM * swpATR * 1.5
-                    S.szBX.set_bgcolor(swpHF ? color(na) : swpFC)
-                    S.szBX.set_right(b.i + 1)
-                    S.szB := false
-                else if b.i - S.szBX.get_right() >= swpML
-                    if b.l < pSL - swpSM * swpATR
-                        S.szBX.set_bgcolor(swpHF ? color(na) : swpFC)
-                        S.szBX.set_right(b.i + 1)
+                if currentBar.close < plotLow - sellSideSweepMargin * sweepAverageTrueRange * 1.5
+                    currentSession.sellZoneBox.set_bgcolor(hideFakeSweepZones ? color(na) : fakeSweepColor)
+                    currentSession.sellZoneBox.set_right(currentBar.index + 1)
+                    currentSession.sellZone := false
+                else if currentBar.index - currentSession.sellZoneBox.get_right() >= sweepMarginLength
+                    if currentBar.low < plotLow - sellSideSweepMargin * sweepAverageTrueRange
+                        currentSession.sellZoneBox.set_bgcolor(hideFakeSweepZones ? color(na) : fakeSweepColor)
+                        currentSession.sellZoneBox.set_right(currentBar.index + 1)
 
-                    S.szB := false
-                    if not swpDT
-                        S.ssB := false
+                    currentSession.sellZone := false
+                    if not detectSweepsOncePerSession
+                        currentSession.sellSide := false
 
-        if _cSes == ldnST and nyamSH
-            lpSL = S.fSLp
+        if _currentSession == londonSessionTitle and newYorkAmSessionShow
+            lastPlotLow = currentSession.lowPrice
 
-            if not S.lssB
+            if not currentSession.lastSellSide
 
-                if b.l < lpSL and b.o > lpSL
-                    alert(syminfo.ticker + ' sellside session level breached, price ' + str.tostring(b.c, format.mintick) + ', timeframe ' + timeframe.period, alert.freq_once_per_bar)
-                    S.lszBX := box.new (b.i - 1, lpSL, b.i + 1, math.max(lpSL - swpSM * swpATR, b.l), bgcolor = swpSC, border_color = color(na))
+                if currentBar.low < lastPlotLow and currentBar.open > lastPlotLow
+                    alert(syminfo.ticker + ' sellside session level breached, price ' + str.tostring(currentBar.close, format.mintick) + ', timeframe ' + timeframe.period, alert.freq_once_per_bar)
+                    currentSession.lastSellZoneBox := box.new (currentBar .index - 1, lastPlotLow, currentBar.index + 1, math.max(lastPlotLow - sellSideSweepMargin * sweepAverageTrueRange, currentBar.low), bgcolor = sellSideSweepColor, border_color = color(na))
+                    sell_side_sweep = true
 
-                    S.lszB := true
-                    S.lssB := true
+                    currentSession.lastSellZone := true
+                    currentSession.lastSellSide := true
 
-            else if S.lszB
+            else if currentSession.lastSellZone
 
-                if b.l > lpSL - swpSM * swpATR and b.h < lpSL + swpSM * swpATR
-                    S.lszBX.set_bottom(math.min(b.l, S.lszBX.get_bottom()))
+                if currentBar.low > lastPlotLow - sellSideSweepMargin * sweepAverageTrueRange and currentBar.high < lastPlotLow + sellSideSweepMargin * sweepAverageTrueRange
+                    currentSession.lastSellZoneBox.set_bottom(math.min(currentBar.low, currentSession.lastSellZoneBox.get_bottom()))
 
-                    if b.l < lpSL
-                        S.lszBX.set_right(b.i + 1)
+                    if currentBar.low < lastPlotLow
+                        currentSession.lastSellZoneBox.set_right(currentBar.index + 1)
                     na
                 else
-                    if b.c < lpSL - swpSM * swpATR * 1.5
-                        S.lszBX.set_bgcolor(swpHF ? color(na) : swpFC)
-                        S.lszBX.set_right(b.i)
-                        S.lszB := false
-                    else if b.i - S.lszBX.get_right() >= swpML
-                        if b.l < lpSL - swpSM * swpATR
-                            S.lszBX.set_bgcolor(swpHF ? color(na) : swpFC)
-                            S.lszBX.set_right(b.i + 1)
+                    if currentBar.close < lastPlotLow - sellSideSweepMargin * sweepAverageTrueRange * 1.5
+                        currentSession.lastSellZoneBox.set_bgcolor(hideFakeSweepZones ? color(na) : fakeSweepColor)
+                        currentSession.lastSellZoneBox.set_right(currentBar.index)
+                        currentSession.lastSellZone := false
+                    else if currentBar.index - currentSession.lastSellZoneBox.get_right() >= sweepMarginLength
+                        if currentBar.low < lastPlotLow - sellSideSweepMargin * sweepAverageTrueRange
+                            currentSession.lastSellZoneBox.set_bgcolor(hideFakeSweepZones ? color(na) : fakeSweepColor)
+                            currentSession.lastSellZoneBox.set_right(currentBar.index + 1)
 
-                        S.lszB := false
-                        if not swpDT
-                            S.lssB := false
+                        currentSession.lastSellZone := false
+                        if not detectSweepsOncePerSession
+                            currentSession.lastSellSide := false
 
-method clear(FVG _id) =>
-    _id.uFVG.pop()
+method clearFairValueGap(FairValueGap _id) =>
+    _id.upperFairValueGaps.pop()
 
-method fvgUpdate(FVG _id, _h, _l, _p) =>
-    cUB = _id.uFVG.get(0)
-    tUB = cUB.get_top()
-    bUB = cUB.get_bottom()
+method updateFairValueGap(FairValueGap _id, _high, _low, _price) =>
+    currentUpperFairValueGap = _id.upperFairValueGaps.get(0)
+    topUpperFairValueGap = currentUpperFairValueGap.get_top()
+    bottomUpperFairValueGap = currentUpperFairValueGap.get_bottom()
 
-    if _h > bUB and _l < tUB
-        if _p
-            if _l > bUB
+    if _high > bottomUpperFairValueGap and _low < topUpperFairValueGap
+        if _price
+            if _low > bottomUpperFairValueGap
                 na
             else
-                fvg.clear()
+                currentFairValueGap.clearFairValueGap()
 
         else
-            if _h < tUB
+            if _high < topUpperFairValueGap
                 na
             else
-                fvg.clear()
+                currentFairValueGap.clearFairValueGap()
 
-    cUB.set_right(b.i)
-
+    currentUpperFairValueGap.set_right(currentBar.index)
+ 
 //-----------------------------------------------------------------------------}
 // Calculations - Sessions Tabular View
 //-----------------------------------------------------------------------------{
 
-S.s.set(0, asST)
-S.oH.set(S.s.indexof(asST)  , str.tonumber(str.substring(asSRT  , 0, str.pos(asSRT  , ":"))))
-S.cH.set(S.s.indexof(asST)  , str.tonumber(str.substring(asEND  , 0, str.pos(asEND  , ":"))))
+currentSession.titles.set(0, asiaSessionTitle)
+currentSession.openHours.set(currentSession.titles.indexof(asiaSessionTitle)  , str.tonumber(str.substring(asiaSessionStartTime  , 0, str.pos(asiaSessionStartTime  , ":"))))
+currentSession.closeHours.set(currentSession.titles.indexof(asiaSessionTitle)  , str.tonumber(str.substring(asiaSessionEndTime  , 0, str.pos(asiaSessionEndTime  , ":"))))
 
-S.s.set(1, ldnST)
-S.oH.set(S.s.indexof(ldnST), str.tonumber(str.substring(ldnSRT , 0, str.pos(ldnSRT , ":"))))
-S.cH.set(S.s.indexof(ldnST), str.tonumber(str.substring(ldnEND , 0, str.pos(ldnEND , ":"))))
+currentSession.titles.set(1, londonSessionTitle)
+currentSession.openHours.set(currentSession.titles.indexof(londonSessionTitle), str.tonumber(str.substring(londonSessionStartTime , 0, str.pos(londonSessionStartTime , ":"))))
+currentSession.closeHours.set(currentSession.titles.indexof(londonSessionTitle), str.tonumber(str.substring(londonSessionEndTime , 0, str.pos(londonSessionEndTime , ":"))))
 
-S.s.set(2, nyamST)
-S.oH.set(S.s.indexof(nyamST) , str.tonumber(str.substring(nyamSRT, 0, str.pos(nyamSRT, ":"))))
-S.cH.set(S.s.indexof(nyamST) , str.tonumber(str.substring(nyamEND, 0, str.pos(nyamEND, ":"))))
+currentSession.titles.set(2, newYorkAmSessionTitle)
+currentSession.openHours.set(currentSession.titles.indexof(newYorkAmSessionTitle) , str.tonumber(str.substring(newYorkAmSessionStartTime, 0, str.pos(newYorkAmSessionStartTime, ":"))))
+currentSession.closeHours.set(currentSession.titles.indexof(newYorkAmSessionTitle) , str.tonumber(str.substring(newYorkAmSessionEndTime, 0, str.pos(newYorkAmSessionEndTime, ":"))))
 
-S.s.set(3, nypmST)
-S.oH.set(S.s.indexof(nypmST) , str.tonumber(str.substring(nypmSRT, 0, str.pos(nypmSRT, ":"))))
-S.cH.set(S.s.indexof(nypmST) , str.tonumber(str.substring(nypmEND, 0, str.pos(nypmEND, ":"))))
+currentSession.titles.set(3, newYorkPmSessionTitle)
+currentSession.openHours.set(currentSession.titles.indexof(newYorkPmSessionTitle) , str.tonumber(str.substring(newYorkPmSessionStartTime, 0, str.pos(newYorkPmSessionStartTime, ":"))))
+currentSession.closeHours.set(currentSession.titles.indexof(newYorkPmSessionTitle) , str.tonumber(str.substring(newYorkPmSessionEndTime, 0, str.pos(newYorkPmSessionEndTime, ":"))))
 
-forex_n_cdf  = syminfo.type == 'forex' or syminfo.type == 'cfd'
+forexOrCfd = syminfo.type == 'forex' or syminfo.type == 'cfd'
 
-statPosition = switch sesPOS
+tablePosition = switch sessionsTabularViewPosition
     'Top Left'      => position.top_left
     'Top Center'    => position.top_center
     'Top Right'     => position.top_right
@@ -490,44 +506,44 @@ statPosition = switch sesPOS
     'Bottom Left'   => position.bottom_left
     'Bottom Center' => position.bottom_center
 
-hide = hIfN ? forex_n_cdf ? true : false : true
+hide = hideIfNotForexMarketInstrument ? forexOrCfd ? true : false : true
 
-if barstate.islast and sesTSH and hide
-    var table clock = table.new(statPosition, 3, 4, border_width = 3)
+if barstate.islast and sessionsTabularViewShow and hide
+    var table clock = table.new(tablePosition, 3, 4, border_width = 3)
 
-    ses = f_sesDet(asST, false)
-    sesC = str.contains(ses, 'Closes') ? #26a69a : #ef5350
-    table.cell(clock, 0, 0, "█", text_size = sesTS, text_color = asC)
-    table.cell(clock, 1, 0, asST , text_color = asC, bgcolor = color.new(asC, 75), text_halign = text.align_left, text_size = sesTS)
-    table.cell(clock, 2, 0, ses, text_color = sesC, bgcolor = color.new(sesC, 75), text_halign = text.align_left, text_size = sesTS)
+    session = sessionDetection(asiaSessionTitle, false)
+    sessionColor = str.contains(session, 'Closes') ? #26a69a : #ef5350
+    table.cell(clock, 0, 0, "█", text_size = sessionsTabularViewTableTextSize, text_color = asiaSessionColor)
+    table.cell(clock, 1, 0, asiaSessionTitle , text_color = asiaSessionColor, bgcolor = color.new(asiaSessionColor, 75), text_halign = text.align_left, text_size = sessionsTabularViewTableTextSize)
+    table.cell(clock, 2, 0, session, text_color = sessionColor, bgcolor = color.new(sessionColor, 75), text_halign = text.align_left, text_size = sessionsTabularViewTableTextSize)
 
-    ses := f_sesDet(ldnST, ldnDST)
-    sesC := str.contains(ses, 'Closes') ? #26a69a : #ef5350
-    table.cell(clock, 0, 1, "█", text_size = sesTS, text_color = ldnC)
-    table.cell(clock, 1, 1, ldnST , text_color = ldnC, bgcolor = color.new(ldnC, 75), text_halign = text.align_left, text_size = sesTS)
-    table.cell(clock, 2, 1, ses, text_color = sesC, bgcolor = color.new(sesC, 75), text_halign = text.align_left, text_size = sesTS)
+    session := sessionDetection(londonSessionTitle, londonDaylightSavingTime)
+    sessionColor := str.contains(session, 'Closes') ? #26a69a : #ef5350
+    table.cell(clock, 0, 1, "█", text_size = sessionsTabularViewTableTextSize, text_color = londonSessionColor)
+    table.cell(clock, 1, 1, londonSessionTitle , text_color = londonSessionColor, bgcolor = color.new(londonSessionColor, 75), text_halign = text.align_left, text_size = sessionsTabularViewTableTextSize)
+    table.cell(clock, 2, 1, session, text_color = sessionColor, bgcolor = color.new(sessionColor, 75), text_halign = text.align_left, text_size = sessionsTabularViewTableTextSize)
 
-    ses := f_sesDet(nyamST, nyDST)
-    sesC := str.contains(ses, 'Closes') ? #26a69a : #ef5350
-    table.cell(clock, 0, 2, "█", text_size = sesTS, text_color = nyamC)
-    table.cell(clock, 1, 2, nyamST , text_color = nyamC, bgcolor = color.new(nyamC, 75), text_halign = text.align_left, text_size = sesTS)
-    table.cell(clock, 2, 2, ses, text_color = sesC , bgcolor = color.new(sesC, 75), text_halign = text.align_left, text_size = sesTS)
+    session := sessionDetection(newYorkAmSessionTitle, newYorkDaylightSavingTime)
+    sessionColor := str.contains(session, 'Closes') ? #26a69a : #ef5350
+    table.cell(clock, 0, 2, "█", text_size = sessionsTabularViewTableTextSize, text_color = newYorkAmSessionColor)
+    table.cell(clock, 1, 2, newYorkAmSessionTitle , text_color = newYorkAmSessionColor, bgcolor = color.new(newYorkAmSessionColor, 75), text_halign = text.align_left, text_size = sessionsTabularViewTableTextSize)
+    table.cell(clock, 2, 2, session, text_color = sessionColor , bgcolor = color.new(sessionColor, 75), text_halign = text.align_left, text_size = sessionsTabularViewTableTextSize)
 
-    ses := f_sesDet(nypmST, nyDST)
-    sesC := str.contains(ses, 'Closes') ? #26a69a : #ef5350
-    table.cell(clock, 0, 3, "█", text_size = sesTS, text_color = nypmC)
-    table.cell(clock, 1, 3, nypmST, text_color = nypmC, bgcolor = color.new(nypmC, 75), text_halign = text.align_left, text_size = sesTS)
-    table.cell(clock, 2, 3, ses, text_color = sesC , bgcolor = color.new(sesC, 75), text_halign = text.align_left, text_size = sesTS)
+    session := sessionDetection(newYorkPmSessionTitle, newYorkDaylightSavingTime)
+    sessionColor := str.contains(session, 'Closes') ? #26a69a : #ef5350
+    table.cell(clock, 0, 3, "█", text_size = sessionsTabularViewTableTextSize, text_color = newYorkPmSessionColor)
+    table.cell(clock, 1, 3, newYorkPmSessionTitle, text_color = newYorkPmSessionColor, bgcolor = color.new(newYorkPmSessionColor, 75), text_halign = text.align_left, text_size = sessionsTabularViewTableTextSize)
+    table.cell(clock, 2, 3, session, text_color = sessionColor , bgcolor = color.new(sessionColor, 75), text_halign = text.align_left, text_size = sessionsTabularViewTableTextSize)
 
 //-----------------------------------------------------------------------------}
 // Calculations - Sessions
 //-----------------------------------------------------------------------------{
 
-if timeframe.isintraday and tfM <= 5
-    f_pSWP(asSH  , asST  , ldnSH  ? ldnST  : nyamSH ? nyamST : nypmSH ? nypmST : asST  , false , asC  , asMMP  , asBG  , asSM  )
-    f_pSWP(ldnSH , ldnST , nypmSH ? nypmST : asSH   ? asST   : ldnST , ldnDST, ldnC , ldnMMP , ldnBG , ldnSM )
-    f_pSWP(nyamSH, nyamST, nypmSH ? nypmST : asSH   ? asST   : ldnSH  ? ldnST  : nyamST, nyDST , nyamC, nyamMMP, nyamBG, nyamSM)
-    f_pSWP(nypmSH, nypmST, asSH   ? asST   : ldnSH  ? ldnST  : nyamSH ? nyamST : nypmST, nyDST , nypmC, nypmMMP, nypmBG, nypmSM) 
+if timeframe.isintraday and timeframeMultiplier <= 5
+    plotSession(asiaSessionShow  , asiaSessionTitle  , londonSessionShow  ? londonSessionTitle  : newYorkAmSessionShow ? newYorkAmSessionTitle : newYorkPmSessionShow ? newYorkPmSessionTitle : asiaSessionTitle  , false , asiaSessionColor  , asiaSessionExtendMaxMinMid  , asiaSessionFillBackground  , asiaSessionShowMargin  )
+    plotSession(londonSessionShow , londonSessionTitle , newYorkPmSessionShow ? newYorkPmSessionTitle : asiaSessionShow   ? asiaSessionTitle   : londonSessionTitle , londonDaylightSavingTime, londonSessionColor , londonSessionExtendMaxMinMid , londonSessionFillBackground , londonSessionShowMargin )
+    plotSession(newYorkAmSessionShow, newYorkAmSessionTitle, newYorkPmSessionShow ? newYorkPmSessionTitle : asiaSessionShow   ? asiaSessionTitle   : londonSessionShow  ? londonSessionTitle  : newYorkAmSessionTitle, newYorkDaylightSavingTime , newYorkAmSessionColor, newYorkAmSessionExtendMaxMinMid, newYorkAmSessionFillBackground, newYorkAmSessionShowMargin)
+    plotSession(newYorkPmSessionShow, newYorkPmSessionTitle, asiaSessionShow   ? asiaSessionTitle   : londonSessionShow  ? londonSessionTitle  : newYorkAmSessionShow ? newYorkAmSessionTitle : newYorkPmSessionTitle, newYorkDaylightSavingTime , newYorkPmSessionColor, newYorkPmSessionExtendMaxMinMid, newYorkPmSessionFillBackground, newYorkPmSessionShowMargin) 
 else
     var table note = table.new(position.bottom_right, 1, 1)
     if barstate.islast
@@ -537,71 +553,96 @@ else
 // Calculations - Market Structure Shifts
 //-----------------------------------------------------------------------------{
 
-pp_h = ta.pivothigh(mssLN, mssLN)
-pp_l = ta.pivotlow (mssLN, mssLN)
+pivotHigh = ta.pivothigh(marketStructureShiftsDetectionLength, marketStructureShiftsDetectionLength)
+pivotLow = ta.pivotlow (marketStructureShiftsDetectionLength, marketStructureShiftsDetectionLength)
 
-if not na(pp_h)
-    pp.h  := pp_h
-    pp.hx := false
-    pp.ht := b.i - mssLN
+if not na(pivotHigh)
+    currentPivotPoint.high  := pivotHigh
+    currentPivotPoint.highCrossed := false
+    currentPivotPoint.highTime := currentBar.index - marketStructureShiftsDetectionLength
 
-if not na(pp_l)
-    pp.l  := pp_l
-    pp.lx := false
-    pp.lt := b.i - mssLN
+if not na(pivotLow)
+    currentPivotPoint.low  := pivotLow
+    currentPivotPoint.lowCrossed := false
+    currentPivotPoint.lowTime := currentBar.index - marketStructureShiftsDetectionLength
 
-if mssSH
-    if b.c > pp.h and not pp.hx
-        pp.hx := true
+if marketStructureShiftsShow
+    if currentBar.close > currentPivotPoint.high and not currentPivotPoint.highCrossed
+        currentPivotPoint.highCrossed := true
 
         if shift == -1
-            line.new(pp.ht, pp.h, b.i, pp.h, color = ppLCB)
-            box.new (pp.ht, pp.h, b.i, pp.h, text = 'CHoCH', text_size = size.tiny, text_halign = text.align_left, text_valign = text.align_bottom, 
-                      text_color = ppLCB, bgcolor = color(na), border_color = color(na))
+            line.new(currentPivotPoint.highTime, currentPivotPoint.high, currentBar.index, currentPivotPoint.high, color = marketStructureShiftsBullishColor)
+            box.new (currentPivotPoint.highTime, currentPivotPoint.high, currentBar.index, currentPivotPoint.high, text = 'CHoCH', text_size = size.tiny, text_halign = text.align_left, text_valign = text.align_bottom, 
+                      text_color = marketStructureShiftsBullishColor, bgcolor = color(na), border_color = color(na))
+            marketStructureShiftsBullish := true
         shift := 1
 
-    if b.c < pp.l and not pp.lx
-        pp.lx := true
+    if currentBar.close < currentPivotPoint.low and not currentPivotPoint.lowCrossed
+        currentPivotPoint.lowCrossed := true
 
         if shift == 1
-            line.new(pp.lt, pp.l, b.i, pp.l, color = ppLCS)
-            box.new (pp.lt, pp.l, b.i, pp.l, text = 'CHoCH', text_size = size.tiny, text_halign = text.align_left, text_valign = text.align_top, 
-                      text_color = ppLCS, bgcolor = color(na), border_color = color(na))
+            line.new(currentPivotPoint.lowTime, currentPivotPoint.low, currentBar.index, currentPivotPoint.low, color = marketStructureShiftsBearishColor)
+            box.new (currentPivotPoint.lowTime, currentPivotPoint.low, currentBar.index, currentPivotPoint.low, text = 'CHoCH', text_size = size.tiny, text_halign = text.align_left, text_valign = text.align_top, 
+                      text_color = marketStructureShiftsBearishColor, bgcolor = color(na), border_color = color(na))
+            marketStructureShiftsBearish := true
         shift := -1
 
 //-----------------------------------------------------------------------------}
 // Calculations - Fair Value Gaps
 //-----------------------------------------------------------------------------{
 
-if fvgSH
-    bullG = b.l > b.h[1]
-    bearG = b.h < b.l[1]
+if fairValueGapsShow
+    bullishGap = currentBar.low > currentBar.high[1]
+    bearishGap = currentBar.high < currentBar.low[1]
 
-    bull  = (b.l - b.h[2]) > fvgATR and b.l > b.h[2] and b.c[1] > b.h[2] and not (bullG or bullG[1])
+    bullish  = (currentBar.low - currentBar.high[2]) > fairValueGapAverageTrueRange and currentBar.low > currentBar.high[2] and currentBar.close[1] > currentBar.high[2] and not (bullishGap or bullishGap[1])
 
-    if bull 
-        if fvg.uFVG.size() > 0
-            fvg.clear()
+    if bullish 
+        if currentFairValueGap.upperFairValueGaps.size() > 0
+            currentFairValueGap.clearFairValueGap()
 
-        fvg.uFVG.push(box.new (b.i - 1, b.l, b.i, b.h[2], na, bgcolor = fvgBC))
+        currentFairValueGap.upperFairValueGaps.push(box.new (currentBar.index - 1, currentBar.low, currentBar.index, currentBar.high[2], na, bgcolor = fairValueGapsBullishColor))
 
         last := true
 
-    bear  = (b.l[2] - b.h) > fvgATR and b.h < b.l[2] and b.c[1] < b.l[2] and not (bearG or bearG[1])
+    bearish  = (currentBar.low[2] - currentBar.high) > fairValueGapAverageTrueRange and currentBar.high < currentBar.low[2] and currentBar.close[1] < currentBar.low[2] and not (bearishGap or bearishGap[1])
 
-    if bear 
-        if fvg.uFVG.size() > 0
-            fvg.clear()
+    if bearish 
+        if currentFairValueGap.upperFairValueGaps.size() > 0
+            currentFairValueGap.clearFairValueGap()
 
-        fvg.uFVG.push(box.new (b.i - 1, b.l[2], b.i, b.h, na, bgcolor = fvgSC))
+
+        currentFairValueGap.upperFairValueGaps.push(box.new (currentBar.index - 1, currentBar.low[2], currentBar.index, currentBar.high, na, bgcolor = fairValueGapsBearishColor))
 
         last := false
 
-    if bullG or bearG
-        if fvg.uFVG.size() > 0
-            fvg.clear()
+    if bullishGap or bearishGap
+        if currentFairValueGap.upperFairValueGaps.size() > 0
+            currentFairValueGap.clearFairValueGap()
 
-    if fvg.uFVG.size() > 0
-        fvg.fvgUpdate(b.h, b.l, last)
+
+    if currentFairValueGap.upperFairValueGaps.size() > 0
+        updateFairValueGap(currentFairValueGap, currentBar.high, currentBar.low, last)
 
 //-----------------------------------------------------------------------------}
+// Strategy
+//-----------------------------------------------------------------------------{
+
+
+
+if buy_side_sweep
+    if marketStructureShiftsBearish
+        strategy.entry("Short", strategy.short)
+        if bar_index == asiatic_session_low
+            strategy.close("Short")
+if sell_side_sweep
+    if marketStructureShiftsBullish
+        strategy.entry("Long", strategy.long)
+        if bar_index == asiatic_session_high
+            strategy.close("Long")
+        //strategy.exit("Stop Loss", "Long", stop=asiatic_session_low)
+
+
+
+//-----------------------------------------------------------------------------}
+
